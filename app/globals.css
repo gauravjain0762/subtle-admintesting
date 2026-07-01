@@ -1,26 +1,147 @@
 @import "tailwindcss";
 
+/* ── Exact fonts & variables matching subtle-kitchen.vercel.app ── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --yellow:       #fff39a;
+  --yellow-dark:  #f5d800;
+  --black:        #0a0a0a;
+  --cream:        #fdf8ec;
+  --white:        #ffffff;
+  --border-dark:  #1a1a1a;
+  --text-muted:   #6b6b5a;
+
+  /* Admin-specific tokens */
+  --bg:           #fdf8ec;
+  --card:         #ffffff;
+  --card-border:  #e8e0cc;
+  --sidebar-bg:   #0a0a0a;
+  --sidebar-text: #b0b098;
+  --green:        #2d6a2d;
+  --green-bg:     #edf7ed;
+  --red:          #b83232;
+  --red-bg:       #fef2f2;
+  --blue:         #0a3d8f;
+  --blue-bg:      #e8f0fe;
+  --orange:       #7a5a00;
+  --orange-bg:    #fffce0;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans:               var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+  --color-background:        var(--bg);
+  --color-foreground:        var(--black);
+  --color-card:              var(--card);
+  --color-border:            var(--card-border);
+  --color-muted:             #f0e9d6;
+  --color-muted-foreground:  var(--text-muted);
+  --color-primary:           var(--black);
+  --color-primary-foreground:#ffffff;
+  --color-accent:            var(--yellow-dark);
+  --color-destructive:       var(--red);
+
+  /* SK brand colours as Tailwind utilities */
+  --color-sk-yellow:        var(--yellow-dark);
+  --color-sk-yellow-light:  var(--yellow);
+  --color-sk-cream:         var(--cream);
+  --color-sk-black:         var(--black);
+  --color-sk-muted:         var(--text-muted);
+  --color-sk-border:        var(--card-border);
+  --color-sidebar:          var(--sidebar-bg);
+  --color-sidebar-text:     var(--sidebar-text);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body {
+    font-family: var(--font-inter), 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--bg);
+    color: var(--black);
+    scroll-behavior: smooth;
   }
+
+  ::selection {
+    background: rgba(245, 216, 0, 0.4);
+    color: var(--black);
+  }
+
+  :focus-visible {
+    outline: 2px solid rgba(245, 216, 0, 0.7);
+    outline-offset: 2px;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Reusable animation keyframes (matching subtle-kitchen site) ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Staggered data-animate pattern */
+[data-animate] {
+  opacity: 0;
+  transition:
+    translate 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    scale    0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity  0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+[data-animate="fade-up"]    { translate: 0 28px; }
+[data-animate="scale-in"]   { scale: 0.95; }
+[data-animate="slide-right"]{ translate: -28px 0; }
+[data-animate].visible      { opacity: 1; translate: 0; scale: 1; }
+
+/* ── Utility helpers ── */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #e0d8c0 transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #e0d8c0; border-radius: 2px; }
+
+  .sk-card {
+    background: var(--card);
+    border: 1.5px solid var(--card-border);
+    border-radius: 16px;
+  }
+
+  /* Yellow badge, matching site */
+  .badge-yellow {
+    background: var(--yellow);
+    color: var(--black);
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* Hover lift */
+  .hover-lift {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
 }
