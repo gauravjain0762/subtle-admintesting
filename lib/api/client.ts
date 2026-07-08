@@ -40,8 +40,11 @@ interface ApiFetchOptions extends Omit<RequestInit, "body"> {
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const { auth = true, body, headers, ...rest } = options;
 
+  // FormData sets its own multipart boundary in the Content-Type header — never override it.
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+
   const finalHeaders: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(headers as Record<string, string> | undefined),
   };
 
@@ -55,7 +58,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     res = await fetch(`${API_BASE_URL}${path}`, {
       ...rest,
       headers: finalHeaders,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isFormData ? (body as FormData) : JSON.stringify(body),
     });
   } catch {
     throw new ApiError("Could not reach the server. Check your connection and try again.", 0);

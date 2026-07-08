@@ -60,10 +60,9 @@ function mapCompany(w: ApiWorkspace): Company {
     name: w.name,
     code: w.code ?? "",
     industry: w.premiseType ?? "",
-    // Not returned by GET /api/admin/workspaces — no contact/email/phone on the workspace record itself.
-    contact: "",
-    email: "",
-    phone: "",
+    contact: [w.firstName, w.lastName].filter(Boolean).join(" "),
+    email: w.email ?? "",
+    phone: w.phone ?? "",
     employees: w.employees ?? "",
     activeOrders: w.totalOrders ?? 0,
     // No spend/billing field on the backend yet.
@@ -91,12 +90,18 @@ function mapCompany(w: ApiWorkspace): Company {
   };
 }
 
+/** In-memory cache of the last successful fetch, so navigating list → detail doesn't re-hit the network for data we already have. */
+let cache: Company[] | null = null;
+
 export async function getCompanies(): Promise<Company[]> {
   const raw = await fetchWorkspaces();
-  return raw.map(mapCompany);
+  cache = raw.map(mapCompany);
+  return cache;
 }
 
 export async function getCompany(id: string): Promise<Company | undefined> {
+  const hit = cache?.find((c) => c.id === id);
+  if (hit) return hit;
   const all = await getCompanies();
   return all.find((c) => c.id === id);
 }
@@ -134,5 +139,5 @@ export const PLAN_COLOR: Record<string, { color: string; bg: string }> = {
 
 export const STATUS_DISPLAY = {
   active:    { label: "Active",    color: "#2d6a2d", bg: "#edf7ed" },
-  suspended: { label: "Suspended", color: "#b83232", bg: "#fef2f2" },
+  suspended: { label: "Inactive", color: "#b83232", bg: "#fef2f2" },
 } as const;

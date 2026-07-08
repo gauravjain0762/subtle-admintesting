@@ -8,10 +8,11 @@ import { Search, Eye, Check, MoreVertical, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   getEnquiries, approveEnquiry, rejectEnquiry,
-  type Enquiry,
+  type Enquiry, type EnquiryStatus,
 } from "@/lib/enquiries-store";
 import { LOGO_COLORS, generateCode } from "@/lib/companies-store";
 import { ApiError } from "@/lib/api/client";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -33,6 +34,12 @@ const M = {
   textFaint: "#444444",
   green: "#22c55e",
   red: "#ff6b6b",
+};
+
+const STATUS_CFG: Record<EnquiryStatus, { label: string; color: string; bg: string }> = {
+  new:      { label: "Pending",  color: M.gold,  bg: "#2a2400" },
+  approved: { label: "Approved", color: M.green, bg: "#0d2a1a" },
+  rejected: { label: "Rejected", color: M.red,   bg: "#2a0a0a" },
 };
 
 function RejectModal({ enquiry, working, onConfirm, onClose }: {
@@ -184,7 +191,7 @@ export default function CompanyRequestsPage() {
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: M.surface }}>
-                {["Company", "Details", "Business Type", "Total Employees", "Address", "Actions"].map((h) => (
+                {["Company", "Details", "Business Type", "Total Employees", "Address", "Status", "Actions"].map((h) => (
                   <th
                     key={h}
                     className="whitespace-nowrap px-3.5 py-3 text-left text-[8.5px] font-bold uppercase tracking-[0.1em]"
@@ -238,65 +245,65 @@ export default function CompanyRequestsPage() {
                     </span>
                   </td>
                   <td className="px-3.5 py-3.5">
-                    <div className="relative inline-block" onClick={(ev) => ev.stopPropagation()}>
+                    <span
+                      className="inline-flex items-center rounded-md px-2.5 py-1 text-[10.5px] font-bold"
+                      style={{ background: STATUS_CFG[e.status].bg, color: STATUS_CFG[e.status].color, border: `1px solid ${STATUS_CFG[e.status].color}` }}
+                    >
+                      {STATUS_CFG[e.status].label}
+                    </span>
+                  </td>
+                  <td className="px-3.5 py-3.5">
+                    <RowActionsMenu
+                      open={openMenuId === e.id}
+                      onOpenChange={(v) => setOpenMenuId(v ? e.id : null)}
+                      menuStyle={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
+                      trigger={
+                        <button
+                          onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
+                          className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                          style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+                          onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.color = M.gold; (ev.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
+                          onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.color = M.textMuted; (ev.currentTarget as HTMLElement).style.borderColor = M.border; }}
+                          aria-label="Actions"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                      }
+                    >
                       <button
-                        onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
-                        className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
-                        style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
-                        onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.color = M.gold; (ev.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
-                        onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.color = M.textMuted; (ev.currentTarget as HTMLElement).style.borderColor = M.border; }}
-                        aria-label="Actions"
+                        onClick={() => { setOpenMenuId(null); router.push(`/dashboard/company-management/requests/detail?id=${e.id}`); }}
+                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                        style={{ color: "#aaaaaa" }}
+                        onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.background = M.surface; (ev.currentTarget as HTMLElement).style.color = M.gold; }}
+                        onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.background = "transparent"; (ev.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
                       >
-                        <MoreVertical size={14} />
+                        <Eye size={13} /> View
                       </button>
-
-                      <AnimatePresence>
-                        {openMenuId === e.id && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                            transition={{ duration: 0.14 }}
-                            className="absolute right-0 top-[calc(100%+6px)] z-[90] min-w-[170px] rounded-lg p-1.5"
-                            style={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
-                          >
-                            <button
-                              onClick={() => { setOpenMenuId(null); router.push(`/dashboard/company-management/requests/detail?id=${e.id}`); }}
-                              className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
-                              style={{ color: "#aaaaaa" }}
-                              onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.background = M.surface; (ev.currentTarget as HTMLElement).style.color = M.gold; }}
-                              onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.background = "transparent"; (ev.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
-                            >
-                              <Eye size={13} /> View
-                            </button>
-                            {e.status === "new" && (
-                              <>
-                                <button
-                                  onClick={() => { setOpenMenuId(null); handleApprove(e); }}
-                                  disabled={workingId === e.id}
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
-                                  style={{ color: M.green }}
-                                  onMouseEnter={(ev) => ((ev.currentTarget as HTMLElement).style.background = M.surface)}
-                                  onMouseLeave={(ev) => ((ev.currentTarget as HTMLElement).style.background = "transparent")}
-                                >
-                                  <Check size={13} /> {workingId === e.id ? "Approving…" : "Approve"}
-                                </button>
-                                <button
-                                  onClick={() => { setOpenMenuId(null); setRejectTarget(e); }}
-                                  disabled={workingId === e.id}
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
-                                  style={{ color: M.red }}
-                                  onMouseEnter={(ev) => ((ev.currentTarget as HTMLElement).style.background = M.surface)}
-                                  onMouseLeave={(ev) => ((ev.currentTarget as HTMLElement).style.background = "transparent")}
-                                >
-                                  <XIcon size={13} /> Reject
-                                </button>
-                              </>
-                            )}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                      {e.status !== "approved" && (
+                        <button
+                          onClick={() => { setOpenMenuId(null); handleApprove(e); }}
+                          disabled={workingId === e.id}
+                          className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                          style={{ color: M.green }}
+                          onMouseEnter={(ev) => ((ev.currentTarget as HTMLElement).style.background = M.surface)}
+                          onMouseLeave={(ev) => ((ev.currentTarget as HTMLElement).style.background = "transparent")}
+                        >
+                          <Check size={13} /> {workingId === e.id ? "Approving…" : "Approve"}
+                        </button>
+                      )}
+                      {e.status === "new" && (
+                        <button
+                          onClick={() => { setOpenMenuId(null); setRejectTarget(e); }}
+                          disabled={workingId === e.id}
+                          className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                          style={{ color: M.red }}
+                          onMouseEnter={(ev) => ((ev.currentTarget as HTMLElement).style.background = M.surface)}
+                          onMouseLeave={(ev) => ((ev.currentTarget as HTMLElement).style.background = "transparent")}
+                        >
+                          <XIcon size={13} /> Reject
+                        </button>
+                      )}
+                    </RowActionsMenu>
                   </td>
                 </motion.tr>
               ))}

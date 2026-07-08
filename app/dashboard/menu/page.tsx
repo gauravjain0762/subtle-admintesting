@@ -12,6 +12,8 @@ import {
 import { toast } from "sonner";
 import { getDishes, toggleDishAvailable, deleteDish, type Dish } from "@/lib/menu-store";
 import { getMenus, type Menu } from "@/lib/menus-store";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
+import { ApiError } from "@/lib/api/client";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -131,14 +133,23 @@ function DeleteDialog({ dish, onConfirm, onCancel }: { dish: Dish; onConfirm: ()
 export default function MenuPage() {
   const router = useRouter();
   const [dishes,       setDishes]       = useState<Dish[]>([]);
+  const [loading,      setLoading]      = useState(true);
   const [menus,        setMenus]        = useState<Menu[]>([]);
   const [menuFilter,   setMenuFilter]   = useState<"all" | "standard" | "custom">("all");
   const [search,       setSearch]       = useState("");
-  const [openMenuId,   setOpenMenuId]   = useState<number | null>(null);
+  const [openMenuId,   setOpenMenuId]   = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Dish | null>(null);
+  const [workingId,    setWorkingId]    = useState<string | null>(null);
 
+  const refresh = () => {
+    setLoading(true);
+    getDishes()
+      .then(setDishes)
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to load dishes"))
+      .finally(() => setLoading(false));
+  };
   useEffect(() => {
-    setDishes(getDishes());
+    refresh();
     setMenus(getMenus());
   }, []);
 
@@ -155,19 +166,33 @@ export default function MenuPage() {
   const available   = dishes.filter((d) => d.available);
   const unavailable = dishes.filter((d) => !d.available);
 
-  const handleToggle = (dish: Dish) => {
-    const next = toggleDishAvailable(dish.id);
-    setDishes(getDishes());
+  const handleToggle = async (dish: Dish) => {
     setOpenMenuId(null);
-    toast.success(`"${dish.name}" marked ${next ? "available" : "unavailable"}`);
+    setWorkingId(dish.id);
+    try {
+      const next = await toggleDishAvailable(dish.id);
+      refresh();
+      toast.success(`"${dish.name}" marked ${next ? "available" : "unavailable"}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to update dish");
+    } finally {
+      setWorkingId(null);
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
-    deleteDish(deleteTarget.id);
-    setDishes(getDishes());
-    toast.error(`"${deleteTarget.name}" removed from menu`);
-    setDeleteTarget(null);
+    setWorkingId(deleteTarget.id);
+    try {
+      await deleteDish(deleteTarget.id);
+      refresh();
+      toast.error(`"${deleteTarget.name}" removed from menu`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to delete dish");
+    } finally {
+      setWorkingId(null);
+      setDeleteTarget(null);
+    }
   };
 
   return (
@@ -192,7 +217,7 @@ export default function MenuPage() {
           onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.gold; (e.currentTarget as HTMLElement).style.color = "#000000"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.gold; }}
         >
-          <UtensilsCrossed size={13} /> Add Dish
+          <UtensilsCrossed size={13} /> Add Menu
         </motion.button>
       </motion.div>
 
@@ -307,7 +332,7 @@ export default function MenuPage() {
                       exit={{ opacity: 0, x: 12 }}
                       className="group cursor-pointer transition-colors"
                       style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${M.borderFaint}` : "none" }}
-                      onClick={() => router.push(`/dashboard/menu/${dish.id}`)}
+                      onClick={() => router.push(`/dashboard/menu/edit?id=${dish.id}`)}
                       onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "")}
                     >
@@ -369,74 +394,68 @@ export default function MenuPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+                        <RowActionsMenu
+                          open={openMenuId === dish.id}
+                          onOpenChange={(v) => setOpenMenuId(v ? dish.id : null)}
+                          menuStyle={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
+                          trigger={
+                            <button
+                              onClick={() => setOpenMenuId((v) => (v === dish.id ? null : dish.id))}
+                              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                              style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+                              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
+                              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = M.textMuted; (e.currentTarget as HTMLElement).style.borderColor = M.border; }}
+                              aria-label="Actions"
+                            >
+                              <MoreVertical size={14} />
+                            </button>
+                          }
+                        >
                           <button
-                            onClick={() => setOpenMenuId((v) => (v === dish.id ? null : dish.id))}
-                            className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
-                            style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
-                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = M.textMuted; (e.currentTarget as HTMLElement).style.borderColor = M.border; }}
-                            aria-label="Actions"
+                            onClick={() => { setOpenMenuId(null); router.push(`/dashboard/menu/edit?id=${dish.id}`); }}
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                            style={{ color: "#aaaaaa" }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
                           >
-                            <MoreVertical size={14} />
+                            <Eye size={13} /> View
+                          </button>
+                          <button
+                            onClick={() => { setOpenMenuId(null); router.push(`/dashboard/menu/edit?id=${dish.id}`); }}
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                            style={{ color: "#aaaaaa" }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
+                          >
+                            <Edit2 size={13} /> Edit
                           </button>
 
-                          <AnimatePresence>
-                            {openMenuId === dish.id && (
-                              <motion.div
-                                initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                                transition={{ duration: 0.14 }}
-                                className="absolute right-0 top-[calc(100%+6px)] z-[90] min-w-[170px] rounded-lg p-1.5"
-                                style={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
-                              >
-                                <button
-                                  onClick={() => { setOpenMenuId(null); router.push(`/dashboard/menu/${dish.id}`); }}
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
-                                  style={{ color: "#aaaaaa" }}
-                                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; (e.currentTarget as HTMLElement).style.color = M.gold; }}
-                                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
-                                >
-                                  <Eye size={13} /> View
-                                </button>
-                                <button
-                                  onClick={() => { setOpenMenuId(null); router.push(`/dashboard/menu/${dish.id}`); }}
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
-                                  style={{ color: "#aaaaaa" }}
-                                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; (e.currentTarget as HTMLElement).style.color = M.gold; }}
-                                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
-                                >
-                                  <Edit2 size={13} /> Edit
-                                </button>
+                          <div className="my-1 h-px" style={{ background: M.border }} />
+                          <button
+                            onClick={() => handleToggle(dish)}
+                            disabled={workingId === dish.id}
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                            style={{ color: dish.available ? M.red : M.green }}
+                            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
+                            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                          >
+                            {dish.available
+                              ? <><XCircle size={13} /> Unavailable</>
+                              : <><BadgeCheck size={13} /> Available</>}
+                          </button>
 
-                                <div className="my-1 h-px" style={{ background: M.border }} />
-                                <button
-                                  onClick={() => handleToggle(dish)}
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
-                                  style={{ color: dish.available ? M.red : M.green }}
-                                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
-                                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
-                                >
-                                  {dish.available
-                                    ? <><XCircle size={13} /> Unavailable</>
-                                    : <><BadgeCheck size={13} /> Available</>}
-                                </button>
-
-                                <div className="my-1 h-px" style={{ background: M.border }} />
-                                <button
-                                  onClick={() => { setOpenMenuId(null); setDeleteTarget(dish); }}
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
-                                  style={{ color: M.red }}
-                                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
-                                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
-                                >
-                                  <Trash2 size={13} /> Delete
-                                </button>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
+                          <div className="my-1 h-px" style={{ background: M.border }} />
+                          <button
+                            onClick={() => { setOpenMenuId(null); setDeleteTarget(dish); }}
+                            disabled={workingId === dish.id}
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                            style={{ color: M.red }}
+                            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
+                            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </RowActionsMenu>
                       </td>
                     </motion.tr>
                   );
@@ -446,7 +465,13 @@ export default function MenuPage() {
           </table>
         </div>
 
-        {filtered.length === 0 && (
+        {loading && dishes.length === 0 && (
+          <p className="px-4 py-16 text-center text-[12px]" style={{ color: M.textMuted }}>
+            Loading dishes…
+          </p>
+        )}
+
+        {!loading && filtered.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-16">
             <div className="flex h-14 w-14 items-center justify-center rounded-xl" style={{ background: M.surface }}>
               <UtensilsCrossed size={24} style={{ color: M.textMuted }} />

@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft, Building2, Mail, Phone, MapPin,
   Users, Calendar, Briefcase, Clock, Globe,
-  Copy, Power, UtensilsCrossed,
+  Copy, Power, UtensilsCrossed, ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getCompany, setCompanyStatus, type Company } from "@/lib/companies-store";
@@ -37,7 +37,7 @@ const M = {
 
 const STATUS_DISPLAY_M: Record<string, { label: string; color: string }> = {
   active:    { label: "Active",    color: M.green },
-  suspended: { label: "Suspended", color: M.red },
+  suspended: { label: "Inactive", color: M.red },
 };
 
 const fade = (delay = 0) => ({
@@ -229,9 +229,11 @@ function CompanyDetailContent() {
         <h2 className="mb-5 text-[13px] font-bold" style={{ color: M.white }}>Contact Details</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {[
-            { icon: Users,     label: "Total Users",  value: String(company.totalUsers) },
+            { icon: Users,     label: "Contact Name", value: company.contact || "—" },
             { icon: Mail,      label: "Email",        value: company.email || "—" },
             { icon: Phone,     label: "Phone",        value: company.phone || "—" },
+            { icon: Users,     label: "Total Users",  value: String(company.totalUsers) },
+            { icon: ShoppingBag, label: "Active Orders", value: String(company.activeOrders) },
             { icon: Calendar,  label: "Client Since", value: company.since },
           ].map(({ icon: Icon, label, value }) => (
             <div key={label} className="flex items-center gap-3">
@@ -265,8 +267,8 @@ function CompanyDetailContent() {
           </div>
           <p className="mt-1 text-[12px]" style={{ color: M.textMuted }}>
             {company.status === "active"
-              ? "This company is active and can place orders. Suspending it will pause ordering."
-              : "This company is suspended and cannot place orders. Marking it active will resume ordering."}
+              ? "This company is active and can place orders. Marking it inactive will pause ordering."
+              : "This company is inactive and cannot place orders. Marking it active will resume ordering."}
           </p>
         </div>
 

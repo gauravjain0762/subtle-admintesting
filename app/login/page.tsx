@@ -124,8 +124,8 @@ const fadeUp: Variants = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("admin@subtlekitchen.com");
+  const [password, setPassword] = useState("Subtle@123");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

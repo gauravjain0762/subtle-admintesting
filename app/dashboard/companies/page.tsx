@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import { getCompanies, setCompanyStatus, type Company } from "@/lib/companies-store";
 import { ApiError } from "@/lib/api/client";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -36,7 +37,7 @@ const M = {
 
 const STATUS_CFG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   active:    { label: "Active",    color: M.green, icon: BadgeCheck },
-  suspended: { label: "Suspended", color: M.red,   icon: XCircle },
+  suspended: { label: "Inactive", color: M.red,   icon: XCircle },
 };
 
 /* ── Animation variants ─────────────────────────────────────────── */
@@ -265,8 +266,8 @@ export default function CompaniesPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <p className="text-[12px] font-semibold" style={{ color: "#cccccc" }}>{company.contact || "—"}</p>
-                        <p className="text-[10.5px]" style={{ color: M.textFaint }}>{company.email || "—"}</p>
+                        <p className="text-[12px] font-semibold" style={{ color: "#cccccc" }}>{company.email || "—"}</p>
+                        <p className="text-[10.5px]" style={{ color: M.textFaint }}>{company.phone || "—"}</p>
                       </td>
 
                       <td className="px-5 py-4">
@@ -298,62 +299,54 @@ export default function CompaniesPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+                        <RowActionsMenu
+                          open={openMenuId === company.id}
+                          onOpenChange={(v) => setOpenMenuId(v ? company.id : null)}
+                          menuStyle={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
+                          trigger={
+                            <button
+                              onClick={() => setOpenMenuId((v) => (v === company.id ? null : company.id))}
+                              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                              style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+                              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
+                              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = M.textMuted; (e.currentTarget as HTMLElement).style.borderColor = M.border; }}
+                              aria-label="Actions"
+                            >
+                              <MoreVertical size={14} />
+                            </button>
+                          }
+                        >
                           <button
-                            onClick={() => setOpenMenuId((v) => (v === company.id ? null : company.id))}
-                            className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
-                            style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
-                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = M.textMuted; (e.currentTarget as HTMLElement).style.borderColor = M.border; }}
-                            aria-label="Actions"
+                            onClick={() => { setOpenMenuId(null); router.push(`/dashboard/companies/detail?id=${company.id}`); }}
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                            style={{ color: "#aaaaaa" }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
                           >
-                            <MoreVertical size={14} />
+                            <Eye size={13} /> View
                           </button>
 
-                          <AnimatePresence>
-                            {openMenuId === company.id && (
-                              <motion.div
-                                initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                                transition={{ duration: 0.14 }}
-                                className="absolute right-0 top-[calc(100%+6px)] z-[90] min-w-[170px] rounded-lg p-1.5"
-                                style={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
-                              >
+                          <div className="my-1 h-px" style={{ background: M.border }} />
+                          {(["active", "suspended"] as const)
+                            .filter((s) => s !== company.status)
+                            .map((s) => {
+                              const cfg = STATUS_CFG[s];
+                              const SIcon = cfg.icon;
+                              return (
                                 <button
-                                  onClick={() => { setOpenMenuId(null); router.push(`/dashboard/companies/detail?id=${company.id}`); }}
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
-                                  style={{ color: "#aaaaaa" }}
-                                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; (e.currentTarget as HTMLElement).style.color = M.gold; }}
-                                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
+                                  key={s}
+                                  onClick={() => handleSetStatus(company, s)}
+                                  disabled={togglingId === company.id}
+                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                                  style={{ color: cfg.color }}
+                                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
+                                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
                                 >
-                                  <Eye size={13} /> View
+                                  <SIcon size={13} /> {cfg.label}
                                 </button>
-
-                                <div className="my-1 h-px" style={{ background: M.border }} />
-                                {(["active", "suspended"] as const)
-                                  .filter((s) => s !== company.status)
-                                  .map((s) => {
-                                    const cfg = STATUS_CFG[s];
-                                    const SIcon = cfg.icon;
-                                    return (
-                                      <button
-                                        key={s}
-                                        onClick={() => handleSetStatus(company, s)}
-                                        disabled={togglingId === company.id}
-                                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
-                                        style={{ color: cfg.color }}
-                                        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
-                                        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
-                                      >
-                                        <SIcon size={13} /> {cfg.label}
-                                      </button>
-                                    );
-                                  })}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
+                              );
+                            })}
+                        </RowActionsMenu>
                       </td>
                     </motion.tr>
                   );

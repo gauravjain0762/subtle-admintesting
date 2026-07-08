@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Building2,
   UtensilsCrossed,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -39,6 +40,7 @@ const NAV: NavEntry[] = [
     ],
   },
   { label: "Meal Management", href: "/dashboard/menu", icon: UtensilsCrossed },
+  { label: "Weekly Menu", href: "/dashboard/weekly-menu", icon: CalendarDays },
 ];
 
 interface SidebarProps {

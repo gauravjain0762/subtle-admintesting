@@ -33,14 +33,14 @@ export default function TopMealsReportPage() {
 
   useEffect(() => {
     setOrders(getOrders());
-    setDishes(getDishes());
+    getDishes().then(setDishes).catch(() => setDishes([]));
   }, []);
 
   const topMeals = useMemo(() => {
     const filtered = period === "This Wk"
       ? orders.filter((o) => daysSince(o.dateISO) < 7)
       : orders.filter((o) => daysSince(o.dateISO) >= 7 && daysSince(o.dateISO) < 14);
-    const qtyByDish = new Map<number, number>();
+    const qtyByDish = new Map<string, number>();
     for (const o of filtered) {
       for (const item of o.items) {
         qtyByDish.set(item.dishId, (qtyByDish.get(item.dishId) ?? 0) + item.quantity);

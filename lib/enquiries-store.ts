@@ -56,12 +56,18 @@ function mapEnquiry(r: ApiWorkspaceRequest): Enquiry {
   };
 }
 
+/** In-memory cache of the last successful fetch, so navigating list → detail doesn't re-hit the network for data we already have. */
+let cache: Enquiry[] | null = null;
+
 export async function getEnquiries(): Promise<Enquiry[]> {
   const raw = await fetchWorkspaceRequests();
-  return raw.map(mapEnquiry);
+  cache = raw.map(mapEnquiry);
+  return cache;
 }
 
 export async function getEnquiry(id: string): Promise<Enquiry | undefined> {
+  const hit = cache?.find((e) => e.id === id);
+  if (hit) return hit;
   const all = await getEnquiries();
   return all.find((e) => e.id === id);
 }

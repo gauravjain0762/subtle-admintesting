@@ -191,9 +191,12 @@ function RequestDetailContent() {
               {cfg.label}
             </span>
           </div>
+          {enquiry.referenceId && (
+            <p className="mt-1 font-mono text-[11px]" style={{ color: M.textFaint }}>{enquiry.referenceId}</p>
+          )}
         </div>
 
-        {enquiry.status === "new" && (
+        {enquiry.status !== "approved" && (
           <div className="flex items-center gap-2">
             <motion.button
               whileHover={{ scale: working ? 1 : 1.04 }} whileTap={{ scale: 0.96 }}
@@ -206,17 +209,19 @@ function RequestDetailContent() {
             >
               <Check size={13} /> Approve
             </motion.button>
-            <motion.button
-              whileHover={{ scale: working ? 1 : 1.04 }} whileTap={{ scale: 0.96 }}
-              onClick={() => setShowRejectModal(true)}
-              disabled={working}
-              className="flex items-center gap-2 rounded-lg px-4 py-2 text-[12.5px] font-bold transition-colors disabled:opacity-60"
-              style={{ border: `1px solid ${M.red}`, color: M.red }}
-              onMouseEnter={(e) => { if (!working) { (e.currentTarget as HTMLElement).style.background = M.red; (e.currentTarget as HTMLElement).style.color = "#000000"; } }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.red; }}
-            >
-              <XIcon size={13} /> Reject
-            </motion.button>
+            {enquiry.status === "new" && (
+              <motion.button
+                whileHover={{ scale: working ? 1 : 1.04 }} whileTap={{ scale: 0.96 }}
+                onClick={() => setShowRejectModal(true)}
+                disabled={working}
+                className="flex items-center gap-2 rounded-lg px-4 py-2 text-[12.5px] font-bold transition-colors disabled:opacity-60"
+                style={{ border: `1px solid ${M.red}`, color: M.red }}
+                onMouseEnter={(e) => { if (!working) { (e.currentTarget as HTMLElement).style.background = M.red; (e.currentTarget as HTMLElement).style.color = "#000000"; } }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.red; }}
+              >
+                <XIcon size={13} /> Reject
+              </motion.button>
+            )}
           </div>
         )}
       </motion.div>

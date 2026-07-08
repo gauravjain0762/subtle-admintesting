@@ -6,9 +6,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Edit2, Trash2, UtensilsCrossed, Building2, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { getMenus, addMenu, updateMenu, deleteMenu, canDeleteMenu, type Menu } from "@/lib/menus-store";
-import { getDishesByMenu } from "@/lib/menu-store";
+import { getDishes } from "@/lib/menu-store";
 import { getCompanies } from "@/lib/companies-store";
 import { C } from "@/lib/sk-theme";
+import { ApiError } from "@/lib/api/client";
 
 function MenuFormModal({
   initial, onSave, onClose,
@@ -106,7 +107,11 @@ export default function MenusPage() {
   const refresh = () => {
     const allMenus = getMenus();
     setMenus(allMenus);
-    setDishCounts(Object.fromEntries(allMenus.map((m) => [m.id, getDishesByMenu(m.id).length])));
+    getDishes()
+      .then((dishes) => {
+        setDishCounts(Object.fromEntries(allMenus.map((m) => [m.id, dishes.filter((d) => (d.menuId ?? "standard") === m.id).length])));
+      })
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to load dishes"));
     getCompanies()
       .then((companies) => {
         setCompanyCounts(Object.fromEntries(allMenus.map((m) => [m.id, companies.filter((c) => c.menuId === m.id).length])));
@@ -161,7 +166,7 @@ export default function MenusPage() {
           className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold shadow-sm transition-shadow hover:shadow-md"
           style={{ background: C.black, color: C.white }}
         >
-          <Plus size={15} /> New Menu
+          <Plus size={15} /> Add Menu
         </motion.button>
       </motion.div>
 
