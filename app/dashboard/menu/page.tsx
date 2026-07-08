@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Plus, Edit2, Trash2, Star, Flame, X, Leaf as LeafIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { getDishes, toggleDishAvailable, deleteDish, TAG_COLORS, type Dish } from "@/lib/menu-store";
+import { getMenus, getDefaultMenu, type Menu } from "@/lib/menus-store";
 import { SKToggle } from "@/components/ui/sk-toggle";
 import { C } from "@/lib/sk-theme";
 
@@ -198,20 +199,33 @@ function DishCard({
 export default function MenuPage() {
   const router = useRouter();
   const [dishes,       setDishes]       = useState<Dish[]>([]);
+  const [menus,        setMenus]        = useState<Menu[]>([]);
+  const [selectedMenuId, setSelectedMenuId] = useState("standard");
   const [search,       setSearch]       = useState("");
   const [filter,       setFilter]       = useState<"all" | "available" | "unavailable">("all");
   const [deleteTarget, setDeleteTarget] = useState<Dish | null>(null);
 
   useEffect(() => {
     setDishes(getDishes());
+    setMenus(getMenus());
+    const params = new URLSearchParams(window.location.search);
+    const requestedMenuId = params.get("menuId");
+    setSelectedMenuId(requestedMenuId ?? getDefaultMenu().id);
   }, []);
 
-  const filtered = dishes.filter((d) => {
+  const menuDishes = useMemo(
+    () => dishes.filter((d) => (d.menuId ?? "standard") === selectedMenuId),
+    [dishes, selectedMenuId]
+  );
+
+  const filtered = menuDishes.filter((d) => {
     const q = search.toLowerCase();
     const matchSearch = !search || d.name.toLowerCase().includes(q) || d.tags.some((t) => t.toLowerCase().includes(q));
     const matchFilter = filter === "all" || (filter === "available" ? d.available : !d.available);
     return matchSearch && matchFilter;
   });
+
+  const selectedMenu = menus.find((m) => m.id === selectedMenuId);
 
   const handleToggle = (id: number) => {
     const next = toggleDishAvailable(id);
@@ -240,18 +254,48 @@ export default function MenuPage() {
         <div>
           <h1 className="text-[22px] font-bold" style={{ color: C.text }}>Menu</h1>
           <p className="text-[13px]" style={{ color: C.textSub }}>
-            {dishes.filter((d) => d.available).length} of {dishes.length} dishes live
+            {menuDishes.filter((d) => d.available).length} of {menuDishes.length} dishes live in {selectedMenu?.name ?? "Standard Menu"}
           </p>
         </div>
         <motion.button
           whileHover={{ scale: 1.04 }}
           whileTap={{ scale: 0.96 }}
-          onClick={() => router.push("/dashboard/menu/new")}
+          onClick={() => router.push(`/dashboard/menu/new?menuId=${selectedMenuId}`)}
           className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold shadow-sm transition-shadow hover:shadow-md"
           style={{ background: C.black, color: C.white }}
         >
           <Plus size={15} /> Add Dish
         </motion.button>
+      </motion.div>
+
+      {/* Menu selector */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05, duration: 0.34 }}
+        className="flex flex-wrap items-center gap-1.5"
+      >
+        {menus.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => setSelectedMenuId(m.id)}
+            className="rounded-xl px-4 py-2 text-[12px] font-semibold transition-all"
+            style={{
+              background: selectedMenuId === m.id ? C.black : C.white,
+              color:      selectedMenuId === m.id ? C.white : C.textSub,
+              border:     `1.5px solid ${C.cardBorder}`,
+            }}
+          >
+            {m.name}
+          </button>
+        ))}
+        <button
+          onClick={() => router.push("/dashboard/menus")}
+          className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-semibold transition-all"
+          style={{ color: C.textSub, border: `1.5px dashed ${C.cardBorder}` }}
+        >
+          <Plus size={12} /> New Menu
+        </button>
       </motion.div>
 
       {/* Filters */}

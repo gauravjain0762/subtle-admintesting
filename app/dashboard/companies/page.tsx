@@ -2,15 +2,42 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { Montserrat } from "next/font/google";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Building2, Users, ShoppingBag, TrendingUp,
-  Search, Plus, ChevronRight, Filter,
-  BadgeCheck, Clock, XCircle, X,
+  Search, Eye, Sparkles, MoreVertical,
+  BadgeCheck, XCircle, X,
 } from "lucide-react";
-import { getCompanies, type Company, STATUS_DISPLAY, PLAN_COLOR } from "@/lib/companies-store";
-import { C } from "@/lib/sk-theme";
+import { toast } from "sonner";
+import { getCompanies, generateCompanyCode, setCompanyStatus, type Company } from "@/lib/companies-store";
+import { employeeRangeLabel } from "@/lib/enquiries-store";
+
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+/* ── Mentor project reference palette ── */
+const M = {
+  panel: "#0d0d0d",
+  surface: "#111111",
+  border: "#1e1e1e",
+  borderFaint: "#131313",
+  gold: "#f8e396",
+  goldMuted: "rgba(248,227,150,0.6)",
+  goldFaint: "rgba(248,227,150,0.28)",
+  white: "#ffffff",
+  textMuted: "#888888",
+  textFaint: "#444444",
+  green: "#22c55e",
+  red: "#ff6b6b",
+};
+
+const STATUS_CFG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  active:   { label: "Active",   color: M.green, icon: BadgeCheck },
+  inactive: { label: "Inactive", color: M.red,   icon: XCircle },
+};
 
 /* ── Animation variants ─────────────────────────────────────────── */
 const cardVariants = {
@@ -25,30 +52,26 @@ const rowVariants = {
   }),
 };
 
-/* ── Stat card ──────────────────────────────────────────────────── */
-function StatCard({ label, value, sub, icon: Icon, color, bg, trend }: {
-  label: string; value: string | number; sub: string;
-  icon: React.ElementType; color: string; bg: string; trend?: string;
+/* ── Stat card (mentor style: left accent bar) ── */
+function StatCard({ label, value, icon: Icon, accent }: {
+  label: string; value: string | number;
+  icon: React.ElementType; accent: string;
 }) {
   return (
     <motion.div
       variants={cardVariants}
-      whileHover={{ y: -3, boxShadow: "0 12px 32px rgba(0,0,0,0.08)" }}
-      className="rounded-2xl p-5"
-      style={{ background: C.white, border: `1.5px solid ${C.cardBorder}` }}
+      whileHover={{ y: -2 }}
+      className="rounded-lg p-5"
+      style={{ background: M.panel, border: `1px solid ${M.border}`, borderLeft: `3px solid ${accent}` }}
     >
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: C.textMuted }}>{label}</p>
-          <p className="mt-2 text-[30px] font-bold leading-none tracking-tight" style={{ color: C.text }}>{value}</p>
+          <p className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: M.textFaint }}>{label}</p>
+          <p className="mt-3 text-[28px] font-bold leading-none" style={{ color: M.white }}>{value}</p>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ background: bg }}>
-          <Icon size={20} style={{ color }} strokeWidth={1.8} />
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: M.surface }}>
+          <Icon size={16} style={{ color: accent }} strokeWidth={1.8} />
         </div>
-      </div>
-      <div className="mt-3 flex items-center gap-1.5">
-        {trend && <span className="text-[12px] font-semibold" style={{ color: C.green }}>{trend}</span>}
-        <span className="text-[12px]" style={{ color: C.textMuted }}>{sub}</span>
       </div>
     </motion.div>
   );
@@ -59,12 +82,31 @@ export default function CompaniesPage() {
   const router = useRouter();
   const [companies,    setCompanies]    = useState<Company[]>([]);
   const [search,       setSearch]       = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused" | "cancelled">("all");
-  const [planFilter,   setPlanFilter]   = useState("All Plans");
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [openMenuId,   setOpenMenuId]   = useState<string | null>(null);
 
   useEffect(() => {
     setCompanies(getCompanies());
   }, []);
+
+  const handleSetStatus = (company: Company, status: Company["status"]) => {
+    setCompanyStatus(company.id, status);
+    setCompanies(getCompanies());
+    setOpenMenuId(null);
+    toast.success(`"${company.name}" marked ${status}`);
+  };
+
+  const handleGenerateCode = async (company: Company, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setGeneratingId(company.id);
+    try {
+      const code = await generateCompanyCode(company.id);
+      setCompanies(getCompanies());
+      toast.success(`Code generated for "${company.name}": ${code}`);
+    } finally {
+      setGeneratingId(null);
+    }
+  };
 
   const active     = companies.filter((c) => c.status === "active");
   const totalEmp   = companies.reduce((s, c) => s + c.employees, 0);
@@ -75,38 +117,23 @@ export default function CompaniesPage() {
 
   const filtered = companies.filter((c) => {
     const q = search.toLowerCase();
-    const matchSearch = !search ||
+    return !search ||
       c.name.toLowerCase().includes(q) ||
       c.code.toLowerCase().includes(q) ||
       c.contact.toLowerCase().includes(q) ||
       c.city.toLowerCase().includes(q);
-    const matchStatus = statusFilter === "all" || c.status === statusFilter;
-    const matchPlan   = planFilter === "All Plans" || c.plan === planFilter;
-    return matchSearch && matchStatus && matchPlan;
   });
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${montserrat.className}`}>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="flex flex-wrap items-center justify-between gap-4"
       >
-        <div>
-          <h1 className="text-[24px] font-bold tracking-tight" style={{ color: C.text }}>Companies</h1>
-          <p className="mt-0.5 text-[13px]" style={{ color: C.textSub }}>Corporate lunch clients ordering via company HR code</p>
-        </div>
-        <motion.button
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => router.push("/dashboard/companies/new")}
-          className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[12.5px] font-semibold shadow-sm hover:shadow-md"
-          style={{ background: C.black, color: C.white }}
-        >
-          <Plus size={14} /> Add Company
-        </motion.button>
+        <h1 className="text-[26px] font-bold tracking-tight" style={{ color: M.gold }}>Company List</h1>
+        <p className="mt-0.5 text-[12px]" style={{ color: "#D0C5AF" }}>Corporate lunch clients ordering via company HR code</p>
       </motion.div>
 
       {/* Stat cards */}
@@ -116,10 +143,10 @@ export default function CompaniesPage() {
         animate="show"
         className="grid grid-cols-2 gap-4 lg:grid-cols-4"
       >
-        <StatCard label="Total Companies"  value={companies.length} sub="registered clients"           icon={Building2}  color={C.text}  bg={C.muted}    trend="+2" />
-        <StatCard label="Active Companies" value={active.length}    sub={`${companies.length - active.length} paused/cancelled`} icon={BadgeCheck} color={C.green} bg={C.greenBg} />
-        <StatCard label="Total Employees"  value={totalEmp.toLocaleString()} sub="across all companies" icon={Users}       color={C.blue}  bg={C.blueBg}   trend="+45" />
-        <StatCard label="Monthly Revenue"  value={`£${Math.round(totalSpend).toLocaleString()}`} sub="from active clients" icon={TrendingUp} color={C.amber} bg={C.amberBg} trend="+18%" />
+        <StatCard label="Total Companies"  value={companies.length} icon={Building2}  accent={M.textMuted} />
+        <StatCard label="Active Companies" value={active.length}    icon={BadgeCheck} accent={M.green} />
+        <StatCard label="Total Employees"  value={totalEmp.toLocaleString()} icon={Users}       accent={M.gold} />
+        <StatCard label="Monthly Revenue"  value={`£${Math.round(totalSpend).toLocaleString()}`} icon={TrendingUp} accent={M.gold} />
       </motion.div>
 
       {/* Filters */}
@@ -130,52 +157,23 @@ export default function CompaniesPage() {
         className="flex flex-wrap gap-3"
       >
         <div
-          className="flex min-w-[220px] flex-1 items-center gap-2.5 rounded-xl px-4 py-2.5"
-          style={{ border: `1.5px solid ${C.cardBorder}`, background: C.white }}
+          className="flex min-w-[220px] flex-1 items-center gap-2.5 rounded-lg px-4 py-2.5"
+          style={{ border: `1px solid ${M.border}`, background: M.panel }}
         >
-          <Search size={14} style={{ color: C.textMuted }} />
+          <Search size={14} style={{ color: M.textFaint }} />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search company, code, contact…"
             className="flex-1 bg-transparent text-[13px] outline-none"
-            style={{ color: C.text }}
+            style={{ color: M.white }}
           />
           {search && (
-            <button onClick={() => setSearch("")} style={{ color: C.textMuted }}>
+            <button onClick={() => setSearch("")} style={{ color: M.textMuted }}>
               <X size={13} />
             </button>
           )}
-        </div>
-
-        <div className="flex gap-1.5">
-          {(["all", "active", "paused", "cancelled"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
-              className="rounded-xl px-3.5 py-2.5 text-[12px] font-semibold capitalize transition-all"
-              style={{
-                background: statusFilter === f ? C.black : C.white,
-                color:      statusFilter === f ? C.white : C.textSub,
-                border:     `1.5px solid ${C.cardBorder}`,
-              }}
-            >
-              {f === "all" ? "All" : f}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-1.5 rounded-xl px-3.5 py-2.5" style={{ border: `1.5px solid ${C.cardBorder}`, background: C.white }}>
-          <Filter size={13} style={{ color: C.textMuted }} />
-          <select
-            value={planFilter}
-            onChange={(e) => setPlanFilter(e.target.value)}
-            className="bg-transparent text-[12.5px] font-medium outline-none"
-            style={{ color: C.text }}
-          >
-            {["All Plans","Enterprise","Business","Starter"].map((p) => <option key={p}>{p}</option>)}
-          </select>
         </div>
       </motion.div>
 
@@ -184,38 +182,24 @@ export default function CompaniesPage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.45 }}
-        className="overflow-hidden rounded-2xl"
-        style={{ background: C.white, border: `1.5px solid ${C.cardBorder}` }}
+        className="overflow-hidden rounded-xl"
+        style={{ background: M.panel, border: `1px solid ${M.border}` }}
       >
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: `1.5px solid ${C.muted}` }}>
-          <div>
-            <p className="text-[14px] font-bold" style={{ color: C.text }}>Company Directory</p>
-            <p className="text-[12px]" style={{ color: C.textMuted }}>
-              {filtered.length} {filtered.length === 1 ? "company" : "companies"} found
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {[
-              { color: C.green, label: "Active" },
-              { color: C.yellow, label: "Paused" },
-              { color: C.cardBorder, label: "Cancelled" },
-            ].map(({ color, label }) => (
-              <div key={label} className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full" style={{ background: color }} />
-                <span className="text-[11px]" style={{ color: C.textMuted }}>{label}</span>
-              </div>
-            ))}
-          </div>
+        <div className="px-6 py-4" style={{ borderBottom: `1px solid ${M.border}` }}>
+          <p className="text-[13px] font-bold" style={{ color: M.white }}>Company Directory</p>
+          <p className="text-[11.5px]" style={{ color: M.textMuted }}>
+            {filtered.length} {filtered.length === 1 ? "company" : "companies"} found
+          </p>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full border-collapse">
             <thead>
-              <tr style={{ borderBottom: `1px solid ${C.muted}` }}>
-                {["Company","Company Code","HR Contact","Employees","Active Orders","Monthly Spend","Plan","Status",""].map((h) => (
+              <tr style={{ background: M.surface }}>
+                {["Company","Company Code","HR Contact","Employees","Active Orders","Monthly Spend","Status","Actions"].map((h) => (
                   <th key={h}
-                    className="whitespace-nowrap px-5 py-3.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.1em]"
-                    style={{ color: C.textMuted }}>
+                    className="whitespace-nowrap px-5 py-3 text-left text-[8.5px] font-bold uppercase tracking-[0.12em]"
+                    style={{ color: M.goldMuted, borderBottom: `1px solid ${M.border}` }}>
                     {h}
                   </th>
                 ))}
@@ -224,9 +208,8 @@ export default function CompaniesPage() {
             <tbody>
               <AnimatePresence mode="popLayout">
                 {filtered.map((company, i) => {
-                  const sd      = STATUS_DISPLAY[company.status as keyof typeof STATUS_DISPLAY];
-                  const planCfg = PLAN_COLOR[company.plan] ?? PLAN_COLOR.Starter;
-                  const StatusIcon = company.status === "active" ? BadgeCheck : company.status === "paused" ? Clock : XCircle;
+                  const sd = STATUS_CFG[company.status] ?? STATUS_CFG.active;
+                  const StatusIcon = sd.icon;
                   return (
                     <motion.tr
                       key={company.id}
@@ -237,9 +220,9 @@ export default function CompaniesPage() {
                       animate="show"
                       exit={{ opacity: 0, x: 12 }}
                       className="group cursor-pointer transition-colors"
-                      style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${C.muted}` : "none" }}
+                      style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${M.borderFaint}` : "none" }}
                       onClick={() => router.push(`/dashboard/companies/${company.id}`)}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = C.inputBg)}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "")}
                     >
                       <td className="px-5 py-4">
@@ -247,61 +230,76 @@ export default function CompaniesPage() {
                           <motion.div
                             whileHover={{ scale: 1.1, rotate: 3 }}
                             transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold"
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold"
                             style={{ background: company.logoColor, color: company.logoText }}
                           >
                             {company.logo}
                           </motion.div>
                           <div>
-                            <p className="text-[13px] font-bold" style={{ color: C.text }}>{company.name}</p>
-                            <p className="text-[11px]" style={{ color: C.textMuted }}>{company.industry} · {company.city}</p>
+                            <p className="text-[13px] font-bold" style={{ color: M.white }}>{company.name}</p>
+                            <p className="text-[10.5px]" style={{ color: M.textMuted }}>{company.industry} · {company.city}</p>
                           </div>
                         </div>
                       </td>
 
                       <td className="px-5 py-4">
-                        <span
-                          className="inline-flex items-center rounded-lg px-3 py-1.5 font-mono text-[12px] font-bold tracking-wider"
-                          style={{ background: C.muted, color: C.text, border: `1px dashed ${C.cardBorder}` }}
-                        >
-                          {company.code}
-                        </span>
+                        {company.code ? (
+                          <span
+                            className="inline-flex items-center rounded-md px-3 py-1.5 font-mono text-[11.5px] font-bold tracking-wider"
+                            style={{ background: M.surface, color: M.gold, border: `1px dashed ${M.border}` }}
+                          >
+                            {company.code}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={(e) => handleGenerateCode(company, e)}
+                            disabled={generatingId === company.id}
+                            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition-colors disabled:opacity-60"
+                            style={{ border: `1px solid ${M.gold}`, color: M.gold, background: "transparent" }}
+                            onMouseEnter={(e) => { if (generatingId !== company.id) { (e.currentTarget as HTMLElement).style.background = M.gold; (e.currentTarget as HTMLElement).style.color = "#000000"; } }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+                          >
+                            {generatingId === company.id ? (
+                              <>
+                                <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                Generating…
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles size={12} /> Generate Code
+                              </>
+                            )}
+                          </button>
+                        )}
                       </td>
 
                       <td className="px-5 py-4">
-                        <p className="text-[12.5px] font-medium" style={{ color: C.text }}>{company.contact}</p>
-                        <p className="text-[11px]" style={{ color: C.textMuted }}>{company.email}</p>
+                        <p className="text-[12px] font-semibold" style={{ color: "#cccccc" }}>{company.contact}</p>
+                        <p className="text-[10.5px]" style={{ color: M.textFaint }}>{company.email}</p>
                       </td>
 
                       <td className="px-5 py-4">
-                        <div className="flex items-center gap-1.5">
-                          <Users size={13} style={{ color: C.textMuted }} />
-                          <span className="text-[13px] font-semibold" style={{ color: C.text }}>{company.employees}</span>
+                        <div className="flex items-center gap-1.5" title={`${company.employees} employees`}>
+                          <Users size={13} style={{ color: M.textFaint }} />
+                          <span className="text-[13px] font-semibold" style={{ color: M.white }}>{employeeRangeLabel(company.employees)}</span>
                         </div>
                       </td>
 
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-1.5">
-                          <ShoppingBag size={13} style={{ color: C.textMuted }} />
-                          <span className="text-[13px] font-semibold" style={{ color: C.text }}>{company.activeOrders}</span>
+                          <ShoppingBag size={13} style={{ color: M.textFaint }} />
+                          <span className="text-[13px] font-semibold" style={{ color: M.white }}>{company.activeOrders}</span>
                         </div>
                       </td>
 
                       <td className="px-5 py-4">
-                        <span className="text-[13px] font-bold" style={{ color: C.text }}>{company.monthlySpend}</span>
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <span className="rounded-full px-2.5 py-1 text-[11px] font-bold"
-                          style={{ background: planCfg.bg, color: planCfg.color }}>
-                          {company.plan}
-                        </span>
+                        <span className="text-[13px] font-bold" style={{ color: M.gold }}>{company.monthlySpend}</span>
                       </td>
 
                       <td className="px-5 py-4">
                         <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-                          style={{ background: sd.bg, color: sd.color }}
+                          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10.5px] font-bold"
+                          style={{ border: `1px solid ${sd.color}`, color: sd.color }}
                         >
                           <StatusIcon size={10} />
                           {sd.label}
@@ -309,14 +307,61 @@ export default function CompaniesPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <motion.div
-                          initial={{ x: 0, opacity: 0.3 }}
-                          whileHover={{ x: 4, opacity: 1 }}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg"
-                          style={{ color: C.textMuted }}
-                        >
-                          <ChevronRight size={15} />
-                        </motion.div>
+                        <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => setOpenMenuId((v) => (v === company.id ? null : company.id))}
+                            className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                            style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = M.textMuted; (e.currentTarget as HTMLElement).style.borderColor = M.border; }}
+                            aria-label="Actions"
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+
+                          <AnimatePresence>
+                            {openMenuId === company.id && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                                transition={{ duration: 0.14 }}
+                                className="absolute right-0 top-[calc(100%+6px)] z-[90] min-w-[170px] rounded-lg p-1.5"
+                                style={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
+                              >
+                                <button
+                                  onClick={() => { setOpenMenuId(null); router.push(`/dashboard/companies/${company.id}`); }}
+                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                                  style={{ color: "#aaaaaa" }}
+                                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+                                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
+                                >
+                                  <Eye size={13} /> View
+                                </button>
+
+                                <div className="my-1 h-px" style={{ background: M.border }} />
+                                {(["active", "inactive"] as const)
+                                  .filter((s) => s !== company.status)
+                                  .map((s) => {
+                                    const cfg = STATUS_CFG[s];
+                                    const SIcon = cfg.icon;
+                                    return (
+                                      <button
+                                        key={s}
+                                        onClick={() => handleSetStatus(company, s)}
+                                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                                        style={{ color: cfg.color }}
+                                        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
+                                        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                                      >
+                                        <SIcon size={13} /> {cfg.label}
+                                      </button>
+                                    );
+                                  })}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </td>
                     </motion.tr>
                   );
@@ -328,11 +373,11 @@ export default function CompaniesPage() {
 
         {filtered.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-16">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: C.muted }}>
-              <Building2 size={24} style={{ color: C.textMuted }} />
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl" style={{ background: M.surface }}>
+              <Building2 size={24} style={{ color: M.textMuted }} />
             </div>
-            <p className="text-[14px] font-semibold" style={{ color: C.text }}>No companies found</p>
-            <p className="text-[12.5px]" style={{ color: C.textMuted }}>Try a different search or filter</p>
+            <p className="text-[13px] font-semibold" style={{ color: M.white }}>No companies found</p>
+            <p className="text-[12px]" style={{ color: M.textMuted }}>Try a different search or filter</p>
           </div>
         )}
       </motion.div>

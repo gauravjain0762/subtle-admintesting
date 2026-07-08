@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Plus, Check, ChevronDown } from "lucide-react";
+import { ArrowLeft, Plus, Check, ChevronDown, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { addDish, AVAILABLE_TAGS, EMOJI_OPTIONS, TAG_COLORS } from "@/lib/menu-store";
+import { addDish, AVAILABLE_TAGS, EMOJI_OPTIONS, TAG_COLORS, type Ingredient } from "@/lib/menu-store";
+import { getMenus, getDefaultMenu, type Menu } from "@/lib/menus-store";
 import { SKToggle } from "@/components/ui/sk-toggle";
 import { C } from "@/lib/sk-theme";
 
@@ -20,6 +21,8 @@ const EMPTY = {
   available: true,
   popular: false,
   vegan: false,
+  menuId: "standard",
+  ingredients: [] as Ingredient[],
 };
 
 export default function NewDishPage() {
@@ -27,6 +30,19 @@ export default function NewDishPage() {
   const [form, setForm]     = useState({ ...EMPTY });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showEmoji, setShowEmoji] = useState(false);
+  const [menus, setMenus]         = useState<Menu[]>([]);
+  const [menuOpen, setMenuOpen]   = useState(false);
+
+  useEffect(() => {
+    const allMenus = getMenus();
+    setMenus(allMenus);
+    const params = new URLSearchParams(window.location.search);
+    const requestedMenuId = params.get("menuId");
+    const initialMenuId = (requestedMenuId && allMenus.some((m) => m.id === requestedMenuId))
+      ? requestedMenuId
+      : getDefaultMenu().id;
+    setForm((f) => ({ ...f, menuId: initialMenuId }));
+  }, []);
 
   const set = <K extends keyof typeof EMPTY>(k: K, v: (typeof EMPTY)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -36,6 +52,18 @@ export default function NewDishPage() {
       ...f,
       tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag],
     }));
+
+  const addIngredientRow = () =>
+    setForm((f) => ({ ...f, ingredients: [...f.ingredients, { name: "", gramsPerMeal: 0 }] }));
+
+  const updateIngredientRow = (i: number, patch: Partial<Ingredient>) =>
+    setForm((f) => ({
+      ...f,
+      ingredients: f.ingredients.map((ing, idx) => (idx === i ? { ...ing, ...patch } : ing)),
+    }));
+
+  const removeIngredientRow = (i: number) =>
+    setForm((f) => ({ ...f, ingredients: f.ingredients.filter((_, idx) => idx !== i) }));
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -60,6 +88,8 @@ export default function NewDishPage() {
       available:   form.available,
       popular:     form.popular,
       vegan:       form.vegan,
+      menuId:      form.menuId,
+      ingredients: form.ingredients.filter((ing) => ing.name.trim()),
     });
     toast.success(`"${dish.name}" added to menu!`);
     router.push("/dashboard/menu");
@@ -196,6 +226,49 @@ export default function NewDishPage() {
             />
           </Field>
 
+          <Field label="Menu">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-[13px] transition-all"
+                style={{ border: `1.5px solid ${menuOpen ? C.yellow : C.cardBorder}`, background: C.inputBg, color: C.text }}
+              >
+                <span>{menus.find((m) => m.id === form.menuId)?.name ?? "Standard Menu"}</span>
+                <motion.span animate={{ rotate: menuOpen ? 180 : 0 }} transition={{ duration: 0.18 }}>
+                  <ChevronDown size={13} style={{ color: C.textMuted }} />
+                </motion.span>
+              </button>
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.14 }}
+                    className="absolute left-0 right-0 top-full z-[90] mt-1 max-h-48 overflow-y-auto rounded-xl py-1.5"
+                    style={{ background: C.white, border: `1.5px solid ${C.cardBorder}`, boxShadow: "0 8px 28px rgba(0,0,0,0.1)" }}
+                  >
+                    {menus.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => { set("menuId", m.id); setMenuOpen(false); }}
+                        className="flex w-full items-center justify-between px-4 py-2 text-left text-[12.5px] transition-colors"
+                        style={{ color: form.menuId === m.id ? C.text : C.textSub }}
+                        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = C.inputBg)}
+                        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "")}
+                      >
+                        {m.name}
+                        {form.menuId === m.id && <Check size={11} />}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </Field>
+
           <div className="grid grid-cols-3 gap-3">
             {(["price","kcal","protein"] as const).map((k) => (
               <Field key={k}
@@ -225,6 +298,59 @@ export default function NewDishPage() {
               onBlur={(e)  => (e.target.style.borderColor = C.cardBorder)}
             />
           </Field>
+        </div>
+
+        {/* ── Ingredients ── */}
+        <div className="rounded-2xl p-5" style={{ background: C.white, border: `1.5px solid ${C.cardBorder}` }}>
+          <SectionLabel>Ingredients (grams per meal)</SectionLabel>
+          <p className="mb-3 text-[11.5px]" style={{ color: C.textMuted }}>
+            Used to calculate how much to buy on the Kitchen Prep report.
+          </p>
+          <div className="space-y-2.5">
+            {form.ingredients.map((ing, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                <input
+                  type="text"
+                  value={ing.name}
+                  onChange={(e) => updateIngredientRow(i, { name: e.target.value })}
+                  placeholder="e.g. Chicken"
+                  className="flex-1 rounded-xl px-4 py-2.5 text-[13px] outline-none transition-all"
+                  style={{ border: `1.5px solid ${C.cardBorder}`, background: C.inputBg, color: C.text }}
+                  onFocus={(e) => (e.target.style.borderColor = C.yellow)}
+                  onBlur={(e)  => (e.target.style.borderColor = C.cardBorder)}
+                />
+                <div className="relative w-32">
+                  <input
+                    type="number"
+                    value={ing.gramsPerMeal || ""}
+                    onChange={(e) => updateIngredientRow(i, { gramsPerMeal: Number(e.target.value) })}
+                    placeholder="150"
+                    className="w-full rounded-xl py-2.5 pl-4 pr-9 text-[13px] outline-none transition-all"
+                    style={{ border: `1.5px solid ${C.cardBorder}`, background: C.inputBg, color: C.text }}
+                    onFocus={(e) => (e.target.style.borderColor = C.yellow)}
+                    onBlur={(e)  => (e.target.style.borderColor = C.cardBorder)}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: C.textMuted }}>g</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeIngredientRow(i)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors"
+                  style={{ border: `1.5px solid ${C.cardBorder}`, color: C.red }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addIngredientRow}
+            className="mt-3 flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-semibold transition-colors"
+            style={{ border: `1.5px solid ${C.cardBorder}`, color: C.textSub, background: C.inputBg }}
+          >
+            <Plus size={12} /> Add Ingredient
+          </button>
         </div>
 
         {/* ── Tags ── */}

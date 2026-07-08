@@ -9,10 +9,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const sidebarWidth = collapsed ? 64 : 224;
+  const sidebarWidth = collapsed ? 64 : 264;
 
   return (
-    <div className="min-h-screen" style={{ background: "#fdf8ec" }}>
+    <div className="min-h-screen" style={{ background: "#0a0a0a" }}>
       <Sidebar
         collapsed={collapsed}
         onToggle={() => setCollapsed((v) => !v)}

@@ -9,6 +9,7 @@ import {
   getCompany, getCompanyIds, updateCompany, type Company,
   LOGO_COLORS, INDUSTRIES, DELIVERY_DAYS, PLAN_OPTIONS, PLAN_COLOR,
 } from "@/lib/companies-store";
+import { getMenus, type Menu } from "@/lib/menus-store";
 import { C } from "@/lib/sk-theme";
 
 export const dynamicParams = false;
@@ -71,15 +72,19 @@ export default function EditCompanyPage({ params }: { params: Promise<{ id: stri
   const [company, setCompanyData] = useState<Company | null>(null);
   const [form, setForm] = useState<{
     name: string; industry: string; contact: string;
-    email: string; phone: string; city: string;
+    email: string; phone: string; address: string; town: string; city: string; postalCode: string; country: string;
     employees: string; plan: string;
     deliveryDays: string[]; logoColorIdx: number;
+    menuId: string;
   } | null>(null);
   const [errors,       setErrors]       = useState<Record<string, string>>({});
   const [industryOpen, setIndustryOpen] = useState(false);
+  const [menuOpen,     setMenuOpen]     = useState(false);
+  const [menus,        setMenus]        = useState<Menu[]>([]);
   const [saved,        setSaved]        = useState(false);
 
   useEffect(() => {
+    setMenus(getMenus());
     const found = getCompany(id);
     if (!found) { router.replace("/dashboard/companies"); return; }
     setCompanyData(found);
@@ -92,11 +97,16 @@ export default function EditCompanyPage({ params }: { params: Promise<{ id: stri
       contact:      found.contact,
       email:        found.email,
       phone:        found.phone,
+      address:      found.address ?? "",
+      town:         found.town ?? "",
       city:         found.city,
+      postalCode:   found.postalCode ?? "",
+      country:      found.country ?? "United Kingdom",
       employees:    String(found.employees),
       plan:         found.plan,
       deliveryDays: [...found.deliveryDays],
       logoColorIdx: lcIdx >= 0 ? lcIdx : 0,
+      menuId:       found.menuId ?? "standard",
     });
   }, [id, router]);
 
@@ -133,13 +143,18 @@ export default function EditCompanyPage({ params }: { params: Promise<{ id: stri
       contact:      form.contact.trim(),
       email:        form.email.trim(),
       phone:        form.phone.trim(),
+      address:      form.address.trim(),
+      town:         form.town.trim(),
       city:         form.city.trim(),
+      postalCode:   form.postalCode.trim(),
+      country:      form.country.trim() || "United Kingdom",
       employees:    Number(form.employees) || 0,
       plan:         form.plan,
       deliveryDays: form.deliveryDays,
       logo:         initials,
       logoColor:    lc.color,
       logoText:     lc.text,
+      menuId:       form.menuId,
     });
     setSaved(true);
     toast.success(`"${form.name}" updated!`);
@@ -265,12 +280,44 @@ export default function EditCompanyPage({ params }: { params: Promise<{ id: stri
               </div>
             </Field>
 
+            <Field label="Address">
+              <Input
+                value={form.address}
+                onChange={(v) => set("address", v)}
+                placeholder="e.g. 1 Finsbury Ave"
+              />
+            </Field>
+
+            <Field label="Town">
+              <Input
+                value={form.town}
+                onChange={(v) => set("town", v)}
+                placeholder="e.g. London"
+              />
+            </Field>
+
             <Field label="City" required error={errors.city}>
               <Input
                 value={form.city}
                 onChange={(v) => { set("city", v); setErrors((e) => ({ ...e, city: "" })); }}
                 placeholder="e.g. London"
                 error={!!errors.city}
+              />
+            </Field>
+
+            <Field label="Postal Code">
+              <Input
+                value={form.postalCode}
+                onChange={(v) => set("postalCode", v)}
+                placeholder="e.g. EC2A 4BX"
+              />
+            </Field>
+
+            <Field label="Country">
+              <Input
+                value={form.country}
+                onChange={(v) => set("country", v)}
+                placeholder="e.g. United Kingdom"
               />
             </Field>
           </div>
@@ -373,6 +420,48 @@ export default function EditCompanyPage({ params }: { params: Promise<{ id: stri
                   </motion.button>
                 );
               })}
+            </div>
+          </Field>
+
+          {/* Assigned menu */}
+          <Field label="Assigned Menu">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-[13px]"
+                style={{ border: `1.5px solid ${menuOpen ? C.yellow : C.cardBorder}`, background: C.inputBg, color: C.text }}
+              >
+                <span>{menus.find((m) => m.id === form.menuId)?.name ?? "Standard Menu"}</span>
+                <motion.span animate={{ rotate: menuOpen ? 180 : 0 }} transition={{ duration: 0.18 }}>
+                  <ChevronDown size={13} style={{ color: C.textMuted }} />
+                </motion.span>
+              </button>
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.14 }}
+                    className="absolute left-0 right-0 top-full z-[90] mt-1 max-h-48 overflow-y-auto rounded-xl py-1.5"
+                    style={{ background: C.white, border: `1.5px solid ${C.cardBorder}`, boxShadow: "0 8px 28px rgba(0,0,0,0.1)" }}
+                  >
+                    {menus.map((m) => (
+                      <button key={m.id} type="button"
+                        onClick={() => { set("menuId", m.id); setMenuOpen(false); }}
+                        className="flex w-full items-center justify-between px-4 py-2 text-left text-[12.5px]"
+                        style={{ color: form.menuId === m.id ? C.text : C.textSub }}
+                        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = C.inputBg)}
+                        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "")}
+                      >
+                        {m.name}
+                        {form.menuId === m.id && <Check size={11} />}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </Field>
         </div>

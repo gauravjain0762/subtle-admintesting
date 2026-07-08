@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Save, Bell, Globe, Lock, UtensilsCrossed, ChevronRight } from "lucide-react";
+import { Save, Bell, Globe, Lock, UtensilsCrossed, ChevronRight, Percent, X, Plus } from "lucide-react";
 import { SKToggle } from "@/components/ui/sk-toggle";
+import { getSettings, updateSettings, type Settings } from "@/lib/settings-store";
 
 /* ── Labelled field ─────────────────────────────────────────────────── */
 function Field({
@@ -58,18 +59,75 @@ function Section({
   );
 }
 
+/* ── Chip list input ─────────────────────────────────────────────────── */
+function ChipListInput({ values, onChange }: { values: string[]; onChange: (v: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+
+  const addChip = () => {
+    const v = draft.trim();
+    if (!v || values.includes(v)) { setDraft(""); return; }
+    onChange([...values, v]);
+    setDraft("");
+  };
+
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap gap-2">
+        {values.map((v) => (
+          <span
+            key={v}
+            className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold"
+            style={{ background: "#f0e9d6", color: "#6b6b5a" }}
+          >
+            {v}
+            <button onClick={() => onChange(values.filter((x) => x !== v))} style={{ color: "#9b9b89" }}>
+              <X size={11} />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addChip(); } }}
+          placeholder="e.g. Poole"
+          className="flex-1 rounded-xl px-4 py-2.5 text-[13px] outline-none transition-all"
+          style={{ border: "1.5px solid #e8e0cc", background: "#fdf8ec", color: "#0a0a0a" }}
+          onFocus={(e) => (e.target.style.borderColor = "#f5d800")}
+          onBlur={(e) => (e.target.style.borderColor = "#e8e0cc")}
+        />
+        <button
+          type="button"
+          onClick={addChip}
+          className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-semibold"
+          style={{ border: "1.5px solid #e8e0cc", color: "#6b6b5a", background: "#fdf8ec" }}
+        >
+          <Plus size={12} /> Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Page ─────────────────────────────────────────────────────────────── */
 export default function SettingsPage() {
-  const [kitchenName,    setKitchenName]    = useState("Subtle Kitchen");
-  const [kitchenEmail,   setKitchenEmail]   = useState("hello@subtlekitchen.com");
-  const [kitchenPhone,   setKitchenPhone]   = useState("+44 20 7946 0958");
-  const [deliveryRadius, setDeliveryRadius] = useState("5");
-  const [orderCutoff,    setOrderCutoff]    = useState("09:00");
-  const [deliveryTime,   setDeliveryTime]   = useState("12:00-13:00");
-  const [emailNotifs,    setEmailNotifs]    = useState(true);
-  const [smsNotifs,      setSmsNotifs]      = useState(false);
-  const [autoConfirm,    setAutoConfirm]    = useState(true);
-  const [pauseOrders,    setPauseOrders]    = useState(false);
+  const [settings, setSettings] = useState<Settings | null>(null);
+
+  useEffect(() => {
+    setSettings(getSettings());
+  }, []);
+
+  if (!settings) return null;
+
+  const set = <K extends keyof Settings>(k: K, v: Settings[K]) =>
+    setSettings((s) => (s ? { ...s, [k]: v } : s));
+
+  const toggleImmediate = <K extends keyof Settings>(k: K, next: Settings[K]) => {
+    set(k, next);
+    updateSettings({ [k]: next } as Partial<Settings>);
+  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -86,60 +144,103 @@ export default function SettingsPage() {
       {/* Kitchen info */}
       <Section title="Kitchen Details" icon={UtensilsCrossed} iconColor="#f5d800" iconBg="#0a0a0a" delay={0.06}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Kitchen Name"       value={kitchenName}    onChange={setKitchenName}    />
-          <Field label="Contact Email"      type="email" value={kitchenEmail}   onChange={setKitchenEmail}   />
-          <Field label="Phone"              type="tel"   value={kitchenPhone}   onChange={setKitchenPhone}   />
-          <Field label="Delivery Radius (km)" type="number" value={deliveryRadius} onChange={setDeliveryRadius} />
+          <Field label="Kitchen Name"  value={settings.kitchenName}  onChange={(v) => set("kitchenName", v)} />
+          <Field label="Contact Email" type="email" value={settings.kitchenEmail} onChange={(v) => set("kitchenEmail", v)} />
+          <Field label="Phone"         type="tel"   value={settings.kitchenPhone} onChange={(v) => set("kitchenPhone", v)} />
         </div>
       </Section>
 
       {/* Delivery schedule */}
       <Section title="Delivery Schedule" icon={Globe} iconColor="#7a5a00" iconBg="#fffce0" delay={0.12}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Order Cut-off Time" type="time"   value={orderCutoff}  onChange={setOrderCutoff}  />
-          <Field label="Delivery Window"               value={deliveryTime} onChange={setDeliveryTime} placeholder="12:00-13:00" />
+          <Field label="Order Cut-off Time (day before)" type="time" value={settings.orderCutoff} onChange={(v) => set("orderCutoff", v)} />
+          <Field label="Delivery Window" value={settings.deliveryTime} onChange={(v) => set("deliveryTime", v)} placeholder="12:00-13:00" />
+        </div>
+
+        <div className="mt-4">
+          <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#9b9b89" }}>
+            Service Areas
+          </label>
+          <ChipListInput values={settings.serviceAreas} onChange={(v) => set("serviceAreas", v)} />
         </div>
 
         <div
           className="mt-4 flex items-center justify-between rounded-xl p-4"
-          style={{ background: pauseOrders ? "#fef2f2" : "#fdf8ec", border: "1px solid #e8e0cc" }}
+          style={{ background: settings.pauseOrders ? "#fef2f2" : "#fdf8ec", border: "1px solid #e8e0cc" }}
         >
           <div>
             <p className="text-[13px] font-semibold" style={{ color: "#b83232" }}>Pause All Orders</p>
             <p className="text-[11.5px]" style={{ color: "#9b9b89" }}>Temporarily stop accepting new orders</p>
           </div>
           <SKToggle
-            on={pauseOrders}
+            on={settings.pauseOrders}
             onChange={() => {
-              const next = !pauseOrders;
-              setPauseOrders(next);
+              const next = !settings.pauseOrders;
+              toggleImmediate("pauseOrders", next);
               toast[next ? "error" : "success"](next ? "All orders paused" : "Orders resumed");
             }}
           />
         </div>
       </Section>
 
+      {/* Pricing & discounts */}
+      <Section title="Pricing & Discounts" icon={Percent} iconColor="#2d6a2d" iconBg="#edf7ed" delay={0.16}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            label="Max Per-Order Discount (%)" type="number"
+            value={String(settings.maxOrderDiscountPct)}
+            onChange={(v) => set("maxOrderDiscountPct", Math.min(10, Math.max(0, Number(v) || 0)))}
+          />
+          <Field
+            label="Business/Bulk Discount (%)" type="number"
+            value={String(settings.businessDiscountPct)}
+            onChange={(v) => set("businessDiscountPct", Math.max(0, Number(v) || 0))}
+          />
+        </div>
+        <div className="mt-4">
+          <Field
+            label="Qualifying Order Size (meals)" type="number"
+            value={String(settings.businessDiscountThreshold)}
+            onChange={(v) => set("businessDiscountThreshold", Math.max(0, Number(v) || 0))}
+          />
+          <p className="mt-1.5 text-[11px]" style={{ color: "#9b9b89" }}>
+            Minimum meals a business owner/key operator must buy for staff to qualify for the bulk discount.
+          </p>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between rounded-xl p-4" style={{ background: "#fdf8ec", border: "1px solid #e8e0cc" }}>
+          <div>
+            <p className="text-[13px] font-semibold" style={{ color: "#0a0a0a" }}>Pricing Visible to Logged-in Users Only</p>
+            <p className="text-[11.5px]" style={{ color: "#9b9b89" }}>Hide prices from anyone who isn&apos;t signed in</p>
+          </div>
+          <SKToggle
+            on={settings.pricingVisibleToLoggedInOnly}
+            onChange={() => set("pricingVisibleToLoggedInOnly", !settings.pricingVisibleToLoggedInOnly)}
+          />
+        </div>
+      </Section>
+
       {/* Notifications */}
-      <Section title="Notifications" icon={Bell} iconColor="#0a3d8f" iconBg="#e8f0fe" delay={0.18}>
+      <Section title="Notifications" icon={Bell} iconColor="#0a3d8f" iconBg="#e8f0fe" delay={0.2}>
         <div className="space-y-4">
           {[
-            { label: "Email Notifications", sub: "Receive order alerts via email",                             value: emailNotifs, onChange: setEmailNotifs },
-            { label: "SMS Notifications",   sub: "Receive urgent alerts via SMS",                             value: smsNotifs,   onChange: setSmsNotifs   },
-            { label: "Auto-confirm Orders", sub: "Automatically confirm new orders without manual review",    value: autoConfirm, onChange: setAutoConfirm },
+            { key: "emailNotifs" as const, label: "Email Notifications", sub: "Receive order alerts via email" },
+            { key: "smsNotifs"   as const, label: "SMS Notifications",   sub: "Receive urgent alerts via SMS" },
+            { key: "autoConfirm" as const, label: "Auto-confirm Orders", sub: "Automatically confirm new orders without manual review" },
           ].map((item) => (
             <div key={item.label} className="flex items-center justify-between">
               <div>
                 <p className="text-[13px] font-semibold" style={{ color: "#0a0a0a" }}>{item.label}</p>
                 <p className="text-[11.5px]" style={{ color: "#9b9b89" }}>{item.sub}</p>
               </div>
-              <SKToggle on={item.value} onChange={() => item.onChange(!item.value)} />
+              <SKToggle on={settings[item.key]} onChange={() => set(item.key, !settings[item.key])} />
             </div>
           ))}
         </div>
       </Section>
 
       {/* Security */}
-      <Section title="Security" icon={Lock} iconColor="#2d6a2d" iconBg="#edf7ed" delay={0.24}>
+      <Section title="Security" icon={Lock} iconColor="#2d6a2d" iconBg="#edf7ed" delay={0.26}>
         <div className="space-y-2">
           {[
             { label: "Change Password",  sub: "Update your admin password" },
@@ -176,7 +277,7 @@ export default function SettingsPage() {
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
-          onClick={() => toast.success("Settings saved!")}
+          onClick={() => { updateSettings(settings); toast.success("Settings saved!"); }}
           className="flex items-center gap-2.5 rounded-xl px-6 py-3 text-[13px] font-semibold transition-shadow hover:shadow-md"
           style={{ background: "#0a0a0a", color: "#ffffff" }}
         >

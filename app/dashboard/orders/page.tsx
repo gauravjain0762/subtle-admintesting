@@ -1,42 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Filter, Download, CheckCircle2, Truck, Clock, AlertCircle, ChevronLeft, ChevronRight, Eye, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, Download, ChevronLeft, ChevronRight, Eye, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-
-const ALL_ORDERS = [
-  { id: "#ORD-4821", customer: "Sarah Mitchell",   dish: "Chicken Katsu Curry",       amount: "£13.25",  status: "delivered",    date: "02 Jul 2025", type: "weekly" },
-  { id: "#ORD-4820", customer: "James Thompson",   dish: "Mediterranean Salmon",      amount: "£13.25",  status: "in-transit",   date: "02 Jul 2025", type: "one-time" },
-  { id: "#ORD-4819", customer: "Priya Kapoor",     dish: "Chicken Teriyaki",          amount: "£8.50",   status: "preparing",    date: "02 Jul 2025", type: "weekly" },
-  { id: "#ORD-4818", customer: "Acme Corp.",        dish: "Weekly Box (x8)",           amount: "£68.00",  status: "delivered",    date: "02 Jul 2025", type: "business" },
-  { id: "#ORD-4817", customer: "Luke Roberts",     dish: "Tuscan Bean Soup",          amount: "£7.00",   status: "cancelled",    date: "02 Jul 2025", type: "one-time" },
-  { id: "#ORD-4816", customer: "Emma Clarke",      dish: "Margherita Focaccia Pizza", amount: "£8.50",   status: "delivered",    date: "02 Jul 2025", type: "weekly" },
-  { id: "#ORD-4815", customer: "Daniel Park",      dish: "Chicken Katsu Curry",       amount: "£13.25",  status: "delivered",    date: "01 Jul 2025", type: "weekly" },
-  { id: "#ORD-4814", customer: "TechLondon Ltd",   dish: "Team Lunch Box (x12)",      amount: "£102.00", status: "in-transit",   date: "01 Jul 2025", type: "business" },
-  { id: "#ORD-4813", customer: "Olivia Brown",     dish: "Mediterranean Salmon",      amount: "£13.25",  status: "delivered",    date: "01 Jul 2025", type: "one-time" },
-  { id: "#ORD-4812", customer: "Marcus Wilson",    dish: "Tuscan Bean Soup",          amount: "£7.00",   status: "delivered",    date: "01 Jul 2025", type: "weekly" },
-  { id: "#ORD-4811", customer: "Sophie Adams",     dish: "Chicken Teriyaki",          amount: "£8.50",   status: "preparing",    date: "30 Jun 2025", type: "weekly" },
-  { id: "#ORD-4810", customer: "Creative Studio",  dish: "Catering Box (x20)",        amount: "£170.00", status: "delivered",    date: "30 Jun 2025", type: "business" },
-];
-
-const STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  delivered:    { label: "Delivered",  color: "#2d6a2d", bg: "#edf7ed", icon: CheckCircle2 },
-  "in-transit": { label: "In Transit", color: "#0a3d8f", bg: "#e8f0fe", icon: Truck },
-  preparing:    { label: "Preparing",  color: "#7a5a00", bg: "#fffce0", icon: Clock },
-  cancelled:    { label: "Cancelled",  color: "#b83232", bg: "#fef2f2", icon: AlertCircle },
-};
-
-const TYPE_CFG: Record<string, { color: string; bg: string }> = {
-  business: { color: "#0a3d8f", bg: "#e8f0fe" },
-  weekly:   { color: "#7a5a00", bg: "#fffce0" },
-  "one-time": { color: "#6b6b5a", bg: "#f0e9d6" },
-};
+import { getOrders, STATUS_CFG, TYPE_CFG, type Order, type OrderStatus, type OrderType } from "@/lib/orders-store";
 
 const STATUS_FILTERS = ["All", "Delivered", "In Transit", "Preparing", "Cancelled"];
 const TYPE_FILTERS   = ["All Types", "Weekly", "One-Time", "Business"];
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status }: { status: OrderStatus }) {
   const cfg = STATUS_CFG[status];
   if (!cfg) return null;
   const SIcon = cfg.icon;
@@ -51,32 +24,51 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-/* ── Stat cards ─────────────────────────────────────────────────────── */
-const STATS = [
-  { label: "Today's Orders",  value: 12, color: "#0a0a0a", bg: "#f0e9d6" },
-  { label: "Delivered",       value: 8,  color: "#2d6a2d", bg: "#edf7ed" },
-  { label: "In Transit",      value: 2,  color: "#0a3d8f", bg: "#e8f0fe" },
-  { label: "Preparing",       value: 2,  color: "#7a5a00", bg: "#fffce0" },
-];
+function itemsLabel(order: Order): string {
+  if (order.items.length === 0) return "—";
+  if (order.items.length === 1) {
+    const it = order.items[0];
+    return it.quantity > 1 ? `${it.dishName} ×${it.quantity}` : it.dishName;
+  }
+  return order.items.map((it) => `${it.dishName}${it.quantity > 1 ? ` ×${it.quantity}` : ""}`).join(", ");
+}
 
 export default function OrdersPage() {
-  const [search, setSearch] = useState("");
+  const [orders, setOrders]           = useState<Order[]>([]);
+  const [search, setSearch]           = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [typeFilter, setTypeFilter] = useState("All Types");
+  const [typeFilter, setTypeFilter]     = useState("All Types");
 
-  const filtered = ALL_ORDERS.filter((o) => {
+  useEffect(() => {
+    setOrders(getOrders());
+  }, []);
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const todaysOrders = orders.filter((o) => o.dateISO === todayISO);
+
+  const filtered = orders.filter((o) => {
+    const q = search.toLowerCase();
     const matchSearch = !search ||
-      o.customer.toLowerCase().includes(search.toLowerCase()) ||
-      o.id.includes(search) ||
-      o.dish.toLowerCase().includes(search.toLowerCase());
+      o.customerName.toLowerCase().includes(q) ||
+      o.id.toLowerCase().includes(q) ||
+      (o.companyCode ?? "").toLowerCase().includes(q) ||
+      o.items.some((it) => it.dishName.toLowerCase().includes(q));
     const matchStatus =
       statusFilter === "All" ||
       STATUS_CFG[o.status]?.label === statusFilter;
     const matchType =
       typeFilter === "All Types" ||
-      o.type === typeFilter.toLowerCase().replace("-", "-");
+      o.type === (typeFilter.toLowerCase().replace(" ", "-") as OrderType);
     return matchSearch && matchStatus && matchType;
   });
+
+  const stats = [
+    { label: "Today's Orders", value: todaysOrders.length, color: "#0a0a0a", bg: "#f0e9d6" },
+    { label: "Delivered",      value: todaysOrders.filter((o) => o.status === "delivered").length,   color: "#2d6a2d", bg: "#edf7ed" },
+    { label: "In Transit",     value: todaysOrders.filter((o) => o.status === "in-transit").length,  color: "#0a3d8f", bg: "#e8f0fe" },
+    { label: "Preparing",      value: todaysOrders.filter((o) => o.status === "preparing").length,   color: "#7a5a00", bg: "#fffce0" },
+  ];
+  const maxStat = Math.max(1, ...stats.map((s) => s.value));
 
   return (
     <div className="space-y-5">
@@ -89,7 +81,7 @@ export default function OrdersPage() {
       >
         <div>
           <h1 className="text-[22px] font-bold" style={{ color: "#0a0a0a" }}>Orders</h1>
-          <p className="text-[13px]" style={{ color: "#6b6b5a" }}>{ALL_ORDERS.length} total orders today</p>
+          <p className="text-[13px]" style={{ color: "#6b6b5a" }}>{orders.length} total orders</p>
         </div>
         <motion.button
           whileHover={{ scale: 1.03 }}
@@ -104,7 +96,7 @@ export default function OrdersPage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {STATS.map((s, i) => (
+        {stats.map((s, i) => (
           <motion.div
             key={s.label}
             initial={{ opacity: 0, y: 18, scale: 0.97 }}
@@ -121,7 +113,7 @@ export default function OrdersPage() {
               {s.value}
             </p>
             <div className="mt-2 h-1 w-full overflow-hidden rounded-full" style={{ background: "#f0e9d6" }}>
-              <div className="h-full rounded-full" style={{ width: `${(s.value / 12) * 100}%`, background: s.color }} />
+              <div className="h-full rounded-full" style={{ width: `${(s.value / maxStat) * 100}%`, background: s.color }} />
             </div>
           </motion.div>
         ))}
@@ -145,7 +137,7 @@ export default function OrdersPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search orders, customers…"
+              placeholder="Search orders, customers, codes…"
               className="flex-1 bg-transparent text-[13px] outline-none"
               style={{ color: "#0a0a0a" }}
             />
@@ -195,7 +187,7 @@ export default function OrdersPage() {
           <table className="w-full">
             <thead>
               <tr style={{ borderBottom: "1.5px solid #f0e9d6" }}>
-                {["Order ID", "Customer", "Dish", "Type", "Amount", "Status", "Date", ""].map((h) => (
+                {["Order ID", "Customer", "Dish(es)", "Type", "Amount", "Status", "Date", ""].map((h) => (
                   <th
                     key={h}
                     className="px-5 py-3.5 text-left text-[10.5px] font-semibold uppercase tracking-wider"
@@ -209,6 +201,9 @@ export default function OrdersPage() {
             <tbody>
               {filtered.map((order, i) => {
                 const tc = TYPE_CFG[order.type] ?? TYPE_CFG["one-time"];
+                const label = order.companyCode
+                  ? `${order.customerInitials} | ${order.companyCode}`
+                  : order.customerInitials;
                 return (
                   <motion.tr
                     key={order.id}
@@ -224,10 +219,18 @@ export default function OrdersPage() {
                       <span className="text-[12px] font-bold" style={{ color: "#0a0a0a" }}>{order.id}</span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-[12.5px] font-medium" style={{ color: "#0a0a0a" }}>{order.customer}</span>
+                      <span className="text-[12.5px] font-medium" style={{ color: "#0a0a0a" }}>{order.customerName}</span>
+                      <div className="mt-0.5">
+                        <span
+                          className="rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wider"
+                          style={{ background: "#f0e9d6", color: "#6b6b5a" }}
+                        >
+                          {label}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-5 py-3.5 max-w-[180px]">
-                      <span className="text-[12.5px] line-clamp-1" style={{ color: "#6b6b5a" }}>{order.dish}</span>
+                    <td className="px-5 py-3.5 max-w-[220px]">
+                      <span className="text-[12.5px] line-clamp-1" style={{ color: "#6b6b5a" }}>{itemsLabel(order)}</span>
                     </td>
                     <td className="px-5 py-3.5">
                       <span
@@ -238,19 +241,19 @@ export default function OrdersPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-[12.5px] font-bold" style={{ color: "#0a0a0a" }}>{order.amount}</span>
+                      <span className="text-[12.5px] font-bold" style={{ color: "#0a0a0a" }}>{order.totalAmount}</span>
                     </td>
                     <td className="px-5 py-3.5">
                       <StatusBadge status={order.status} />
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-[12px]" style={{ color: "#9b9b89" }}>{order.date}</span>
+                      <span className="text-[12px]" style={{ color: "#9b9b89" }}>{order.dateDisplay}</span>
                     </td>
                     <td className="px-5 py-3.5">
                       <motion.button
                         whileHover={{ scale: 1.15, background: "#f0e9d6" }}
                         whileTap={{ scale: 0.9 }}
-                        onClick={() => toast.success(`Order ${order.id} — ${order.customer}`)}
+                        onClick={() => toast.success(`Order ${order.id} — ${order.customerName}`)}
                         className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors"
                         style={{ color: "#9b9b89" }}
                       >
@@ -270,7 +273,7 @@ export default function OrdersPage() {
           style={{ borderTop: "1px solid #f0e9d6" }}
         >
           <span className="text-[12px]" style={{ color: "#9b9b89" }}>
-            Showing {filtered.length} of {ALL_ORDERS.length} orders
+            Showing {filtered.length} of {orders.length} orders
           </span>
           <div className="flex items-center gap-1">
             <button className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[#f0e9d6]" style={{ color: "#9b9b89" }}>

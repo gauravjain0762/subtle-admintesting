@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Plus, Check, ChevronDown, Building2 } from "lucide-react";
@@ -9,14 +9,16 @@ import {
   addCompany, generateCode,
   LOGO_COLORS, INDUSTRIES, DELIVERY_DAYS, PLAN_OPTIONS, PLAN_COLOR,
 } from "@/lib/companies-store";
+import { getMenus, getDefaultMenu, type Menu } from "@/lib/menus-store";
 import { C } from "@/lib/sk-theme";
 
 const EMPTY = {
   name: "", industry: "Technology", contact: "",
-  email: "", phone: "", city: "",
+  email: "", phone: "", address: "", town: "", city: "", postalCode: "", country: "United Kingdom",
   employees: "", plan: "Starter",
   deliveryDays: [] as string[],
   logoColorIdx: 0,
+  menuId: "standard",
 };
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -71,6 +73,13 @@ export default function NewCompanyPage() {
   const [form, setForm]         = useState({ ...EMPTY });
   const [errors, setErrors]     = useState<Record<string, string>>({});
   const [industryOpen, setIndustryOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menus, setMenus]       = useState<Menu[]>([]);
+
+  useEffect(() => {
+    setMenus(getMenus());
+    setForm((f) => ({ ...f, menuId: getDefaultMenu().id }));
+  }, []);
 
   const set = <K extends keyof typeof EMPTY>(k: K, v: (typeof EMPTY)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -108,7 +117,10 @@ export default function NewCompanyPage() {
       since: new Date().toLocaleDateString("en-GB", { month: "short", year: "numeric" }),
       plan: form.plan, logo: initials,
       logoColor: lc.color, logoText: lc.text,
-      deliveryDays: form.deliveryDays, city: form.city.trim(),
+      deliveryDays: form.deliveryDays, deliveryTimes: [],
+      address: form.address.trim(), town: form.town.trim(), city: form.city.trim(),
+      postalCode: form.postalCode.trim(), country: form.country.trim() || "United Kingdom",
+      menuId: form.menuId,
     });
     toast.success(`"${form.name.trim()}" added! Code: ${code}`);
     router.push("/dashboard/companies");
@@ -249,12 +261,44 @@ export default function NewCompanyPage() {
               </div>
             </Field>
 
+            <Field label="Address">
+              <Input
+                value={form.address}
+                onChange={(v) => set("address", v)}
+                placeholder="e.g. 1 Finsbury Ave"
+              />
+            </Field>
+
+            <Field label="Town">
+              <Input
+                value={form.town}
+                onChange={(v) => set("town", v)}
+                placeholder="e.g. London"
+              />
+            </Field>
+
             <Field label="City" required error={errors.city}>
               <Input
                 value={form.city}
                 onChange={(v) => { set("city", v); setErrors((e) => ({ ...e, city: "" })); }}
                 placeholder="e.g. London"
                 error={!!errors.city}
+              />
+            </Field>
+
+            <Field label="Postal Code">
+              <Input
+                value={form.postalCode}
+                onChange={(v) => set("postalCode", v)}
+                placeholder="e.g. EC2A 4BX"
+              />
+            </Field>
+
+            <Field label="Country">
+              <Input
+                value={form.country}
+                onChange={(v) => set("country", v)}
+                placeholder="e.g. United Kingdom"
               />
             </Field>
           </div>
@@ -370,6 +414,50 @@ export default function NewCompanyPage() {
                   </motion.button>
                 );
               })}
+            </div>
+          </Field>
+
+          {/* Assigned menu */}
+          <Field label="Assigned Menu">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-[13px] transition-all"
+                style={{ border: `1.5px solid ${menuOpen ? C.yellow : C.cardBorder}`, background: C.inputBg, color: C.text }}
+              >
+                <span>{menus.find((m) => m.id === form.menuId)?.name ?? "Standard Menu"}</span>
+                <motion.span animate={{ rotate: menuOpen ? 180 : 0 }} transition={{ duration: 0.18 }}>
+                  <ChevronDown size={13} style={{ color: C.textMuted }} />
+                </motion.span>
+              </button>
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.14 }}
+                    className="absolute left-0 right-0 top-full z-[90] mt-1 max-h-48 overflow-y-auto rounded-xl py-1.5"
+                    style={{ background: C.white, border: `1.5px solid ${C.cardBorder}`, boxShadow: "0 8px 28px rgba(0,0,0,0.1)" }}
+                  >
+                    {menus.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => { set("menuId", m.id); setMenuOpen(false); }}
+                        className="flex w-full items-center justify-between px-4 py-2 text-left text-[12.5px] transition-colors"
+                        style={{ color: form.menuId === m.id ? C.text : C.textSub }}
+                        onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = C.inputBg)}
+                        onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "")}
+                      >
+                        {m.name}
+                        {form.menuId === m.id && <Check size={11} />}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </Field>
         </div>

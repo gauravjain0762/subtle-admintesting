@@ -1,10 +1,115 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail, ArrowRight } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
 import { SkLogoFull } from "@/components/ui/sk-logo";
+
+/* ── Login-page palette (mentor project reference) ── */
+const M = {
+  bg: "#0d0d0d",
+  surface: "#111111",
+  border: "#222222",
+  gold: "#f8e396",
+  goldHover: "#faf0b0",
+  goldBorder: "rgba(248,227,150,0.4)",
+  white: "#ffffff",
+  textMuted: "#666666",
+  textFaint: "#444444",
+  labelGray: "#888888",
+  red: "#ff8a8a",
+  redBg: "rgba(184,50,50,0.12)",
+  redBorder: "rgba(184,50,50,0.35)",
+};
+
+/* ── Sliding food-photo coverflow background (ported from the fitness-admin
+   login reference — same 3D coverflow mechanic, food photography instead of
+   gym photos). Images are hotlinked stock photos for now, per instruction. ── */
+const IMAGES = [
+  "https://images.unsplash.com/photo-1543352632-5a4b24e4d2a6?w=1600&q=75&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=1600&q=75&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1569420077790-afb136b3bb8c?w=1600&q=75&auto=format&fit=crop",
+];
+const N = IMAGES.length;
+
+const getDelta = (i: number, center: number) => {
+  const raw = ((i - center) % N + N) % N;
+  return raw > Math.floor(N / 2) ? raw - N : raw;
+};
+
+const slotStyle = (delta: number, isPreRight: boolean): CSSProperties => {
+  const TRANSITION = "left 0.7s ease-in-out, width 0.7s ease-in-out, transform 0.7s ease-in-out, filter 0.7s ease-in-out, opacity 0.7s ease-in-out";
+  const base: CSSProperties = {
+    position: "absolute",
+    top: 0,
+    height: "100%",
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+    willChange: "transform, left, width, filter",
+  };
+
+  if (isPreRight) {
+    return { ...base, left: "115%", width: "22%", opacity: 0, transform: "perspective(800px) rotateY(-25deg) scale(0.7)", filter: "brightness(0.3)", zIndex: 0, transition: "none" };
+  }
+  if (delta === 0) {
+    return { ...base, left: "22%", width: "56%", transform: "perspective(800px) rotateY(0deg) scale(1)", filter: "brightness(1)", zIndex: 2, transition: TRANSITION };
+  }
+  if (delta === 1) {
+    return { ...base, left: "78%", width: "22%", transform: "perspective(800px) rotateY(-25deg) scale(0.85)", filter: "brightness(0.5)", zIndex: 1, transition: TRANSITION };
+  }
+  if (delta === -1) {
+    return { ...base, left: "0%", width: "22%", transform: "perspective(800px) rotateY(25deg) scale(0.85)", filter: "brightness(0.5)", zIndex: 1, transition: TRANSITION };
+  }
+  return { ...base, left: "-30%", width: "22%", opacity: 0, transform: "perspective(800px) rotateY(25deg) scale(0.7)", filter: "brightness(0.2)", zIndex: 0, transition: TRANSITION };
+};
+
+function FoodCoverflow() {
+  const [center, setCenter] = useState(0);
+  const [preRightIdx, setPreRightIdx] = useState<number | null>(null);
+  const centerRef = useRef(0);
+  const busyRef = useRef(false);
+
+  const advance = useCallback(() => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+
+    const c = centerRef.current;
+    const leftIdx = ((c - 1) % N + N) % N;
+    setPreRightIdx(leftIdx);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const next = (c + 1) % N;
+        centerRef.current = next;
+        setCenter(next);
+        setPreRightIdx(null);
+        setTimeout(() => { busyRef.current = false; }, 750);
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(advance, 3500);
+    return () => clearInterval(t);
+  }, [advance]);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      {IMAGES.map((src, i) => {
+        const delta = getDelta(i, center);
+        const isPreRight = i === preRightIdx;
+        return (
+          <div
+            key={i}
+            style={{ ...slotStyle(delta, isPreRight), backgroundImage: `url(${src})` }}
+          />
+        );
+      })}
+    </div>
+  );
+}
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 18 },
@@ -36,163 +141,105 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className="relative flex min-h-screen items-center justify-center"
-      style={{ background: "#fdf8ec" }}
-    >
-      {/* Background decorative dots */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.25]"
-        style={{
-          backgroundImage: "radial-gradient(#d4c89a 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
-        }}
-      />
+    <div className="relative h-screen w-screen overflow-hidden" style={{ background: M.bg }}>
+      <FoodCoverflow />
 
-      {/* Yellow blob */}
-      <div
-        className="pointer-events-none absolute right-0 top-0 h-[460px] w-[460px] rounded-full"
-        style={{
-          background: "radial-gradient(circle, rgba(245,216,0,0.18) 0%, transparent 70%)",
-          transform: "translate(30%, -30%)",
-        }}
-      />
-      <div
-        className="pointer-events-none absolute bottom-0 left-0 h-[360px] w-[360px] rounded-full"
-        style={{
-          background: "radial-gradient(circle, rgba(245,216,0,0.12) 0%, transparent 70%)",
-          transform: "translate(-30%, 30%)",
-        }}
-      />
-
-      <div className="relative z-10 flex w-full max-w-[420px] flex-col items-center px-6">
-        {/* Logo */}
+      {/* Floating login card, fixed center */}
+      <div className="absolute inset-0 z-10 flex items-center justify-center p-4">
         <motion.div
-          custom={0}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="mb-8 flex flex-col items-center gap-4"
-        >
-          {/* Real SK logo on dark pill */}
-          <div
-            className="flex items-center justify-center rounded-2xl px-6 py-4"
-            style={{
-              background: "#0a0a0a",
-              backgroundImage:
-                "radial-gradient(ellipse at 80% 20%, rgba(245,216,0,0.1) 0%, transparent 60%), radial-gradient(rgba(255,243,154,0.04) 1px, transparent 1px)",
-              backgroundSize: "100% 100%, 22px 22px",
-            }}
-          >
-            <SkLogoFull />
-          </div>
-          <div className="text-center">
-            <h1 className="mt-1 text-[22px] font-bold tracking-tight" style={{ color: "#0a0a0a" }}>
-              Welcome back
-            </h1>
-            <p className="mt-1 text-[13px]" style={{ color: "#6b6b5a" }}>
-              Please enter your admin credentials to continue.
-            </p>
-          </div>
-        </motion.div>
-
-        {/* Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full rounded-2xl p-8"
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-[380px] rounded-xl p-7"
           style={{
-            background: "#ffffff",
-            border: "1.5px solid #e8e0cc",
-            boxShadow: "0 4px 32px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04)",
+            background: "rgba(13,13,13,0.88)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            boxShadow: "0 24px 80px rgba(0,0,0,0.7)",
           }}
         >
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <motion.div custom={0} variants={fadeUp} initial="hidden" animate="show" className="mb-6 flex justify-center">
+            <SkLogoFull />
+          </motion.div>
+
+          <motion.span
+            custom={0} variants={fadeUp} initial="hidden" animate="show"
+            className="mb-4 inline-block w-fit rounded px-3 py-1.5 text-[10px] font-extrabold tracking-[0.2em]"
+            style={{ color: M.gold, border: `1px solid ${M.goldBorder}` }}
+          >
+            ADMIN ACCESS
+          </motion.span>
+
+          <motion.h2
+            custom={1} variants={fadeUp} initial="hidden" animate="show"
+            className="text-[26px] font-extrabold tracking-tight" style={{ color: M.white }}
+          >
+            Welcome back
+          </motion.h2>
+          <motion.p
+            custom={1} variants={fadeUp} initial="hidden" animate="show"
+            className="mb-6 mt-1.5 text-[13px]" style={{ color: M.textMuted }}
+          >
+            Please enter your admin credentials to continue.
+          </motion.p>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {error && (
               <div
                 className="rounded-lg px-3.5 py-2.5 text-[12px] font-medium"
-                style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#b83232" }}
+                style={{ background: M.redBg, border: `1px solid ${M.redBorder}`, color: M.red }}
               >
                 {error}
               </div>
             )}
 
             {/* Email */}
-            <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show">
-              <label
-                className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider"
-                style={{ color: "#6b6b5a" }}
-              >
+            <motion.div custom={2} variants={fadeUp} initial="hidden" animate="show">
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider" style={{ color: M.labelGray }}>
                 Email Address
               </label>
               <div className="relative">
-                <Mail
-                  size={14}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2"
-                  style={{ color: "#9b9b89" }}
-                />
+                <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: M.textFaint }} />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="chef@subtlekitchen.com"
                   autoComplete="email"
-                  className="w-full rounded-lg py-2.5 pl-10 pr-4 text-[13px] outline-none transition-all"
-                  style={{
-                    border: "1.5px solid #e8e0cc",
-                    background: "#fdf8ec",
-                    color: "#0a0a0a",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = "#f5d800")}
-                  onBlur={(e) => (e.target.style.borderColor = "#e8e0cc")}
+                  className="w-full rounded-lg py-2.5 pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-[#333333]"
+                  style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
+                  onFocus={(e) => (e.target.style.borderColor = M.goldBorder)}
+                  onBlur={(e) => (e.target.style.borderColor = M.border)}
                 />
               </div>
             </motion.div>
 
             {/* Password */}
-            <motion.div custom={2} variants={fadeUp} initial="hidden" animate="show">
-              <div className="mb-1.5 flex items-center justify-between">
-                <label
-                  className="text-[11px] font-semibold uppercase tracking-wider"
-                  style={{ color: "#6b6b5a" }}
-                >
-                  Password
-                </label>
-                <button
-                  type="button"
-                  className="text-[11px] font-medium underline"
-                  style={{ color: "#6b6b5a" }}
-                >
-                  Forgot password?
-                </button>
-              </div>
+            <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show">
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider" style={{ color: M.labelGray }}>
+                Password
+              </label>
               <div className="relative">
-                <Lock
-                  size={14}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2"
-                  style={{ color: "#9b9b89" }}
-                />
+                <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: M.textFaint }} />
                 <input
                   type={showPwd ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full rounded-lg py-2.5 pl-10 pr-11 text-[13px] outline-none transition-all"
-                  style={{
-                    border: "1.5px solid #e8e0cc",
-                    background: "#fdf8ec",
-                    color: "#0a0a0a",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = "#f5d800")}
-                  onBlur={(e) => (e.target.style.borderColor = "#e8e0cc")}
+                  className="w-full rounded-lg py-2.5 pl-10 pr-11 text-[13px] outline-none transition-all placeholder:text-[#333333]"
+                  style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
+                  onFocus={(e) => (e.target.style.borderColor = M.goldBorder)}
+                  onBlur={(e) => (e.target.style.borderColor = M.border)}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPwd((v) => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-70"
-                  style={{ color: "#9b9b89" }}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: M.textFaint }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = M.gold)}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = M.textFaint)}
                   aria-label={showPwd ? "Hide password" : "Show password"}
                 >
                   {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -201,20 +248,18 @@ export default function LoginPage() {
             </motion.div>
 
             {/* Submit */}
-            <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show" className="pt-1">
+            <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show" className="pt-1">
               <button
                 type="submit"
                 disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[13px] font-semibold transition-all active:scale-[0.98] disabled:opacity-60"
-                style={{
-                  background: "#0a0a0a",
-                  color: "#ffffff",
-                  boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
-                }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg py-3 text-[13px] font-semibold tracking-[0.15em] transition-all active:scale-[0.98] disabled:opacity-60"
+                style={{ background: M.gold, color: "#000000" }}
+                onMouseEnter={(e) => { if (!loading) (e.currentTarget as HTMLElement).style.background = M.goldHover; }}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = M.gold)}
               >
                 {loading ? (
                   <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/25 border-t-black" />
                     Signing in…
                   </>
                 ) : (
@@ -225,48 +270,19 @@ export default function LoginPage() {
                 )}
               </button>
             </motion.div>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1" style={{ background: "#e8e0cc" }} />
-              <span className="text-[11px]" style={{ color: "#9b9b89" }}>or</span>
-              <div className="h-px flex-1" style={{ background: "#e8e0cc" }} />
-            </div>
-
-            {/* Google */}
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-2.5 rounded-xl border py-2.5 text-[13px] font-medium transition-colors hover:bg-[#fdf8ec]"
-              style={{ border: "1.5px solid #e8e0cc", color: "#0a0a0a" }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Continue with Google
-            </button>
           </form>
-        </motion.div>
 
-        <motion.p
-          custom={4}
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          className="mt-6 text-center text-[12px]"
-          style={{ color: "#9b9b89" }}
-        >
-          Don&apos;t have an account?{" "}
-          <span
-            className="font-semibold underline cursor-pointer"
-            style={{ color: "#6b6b5a" }}
+          <motion.p
+            custom={5} variants={fadeUp} initial="hidden" animate="show"
+            className="mt-5 text-center text-[12px]" style={{ color: M.textMuted }}
           >
-            Contact us
-          </span>{" "}
-          to get a company code.
-        </motion.p>
+            Don&apos;t have an account?{" "}
+            <span className="cursor-pointer font-semibold underline" style={{ color: M.gold }}>
+              Contact us
+            </span>{" "}
+            to get a company code.
+          </motion.p>
+        </motion.div>
       </div>
     </div>
   );

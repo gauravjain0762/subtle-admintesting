@@ -96,11 +96,11 @@ export function SkLogoFull({ className }: { className?: string }) {
 /* ── Logo mark (collapsed sidebar, topbar mobile) ── */
 export function SkLogoMark({ className }: { className?: string }) {
   return (
-    <div className={className} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+    <div className={className} style={{ display: "flex", alignItems: "center", gap: 4 }}>
       <div
         style={{
-          width: 2.5,
-          height: 32,
+          width: 2,
+          height: 24,
           background: "linear-gradient(to bottom, #d4a843, #9a7030)",
           borderRadius: 2,
           flexShrink: 0,
@@ -108,7 +108,7 @@ export function SkLogoMark({ className }: { className?: string }) {
       />
       <div style={{
         fontFamily: "var(--font-inter), 'Inter', sans-serif",
-        fontSize: 15,
+        fontSize: 13,
         fontWeight: 900,
         color: "#ffffff",
         lineHeight: 1,
@@ -124,16 +124,15 @@ export function SkLogoMark({ className }: { className?: string }) {
 /* ── Animated logo for sidebar (collapses/expands) ── */
 export function SkLogoAnimated({ collapsed }: { collapsed: boolean }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 11, overflow: "hidden", minHeight: 62 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
       {/* Gold bar */}
       <motion.div
-        animate={{ height: collapsed ? 32 : 58 }}
+        animate={{ height: collapsed ? 24 : 36 }}
         transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
         style={{
-          width: 2.5,
+          width: 2,
           background: "linear-gradient(to bottom, #d4a843, #9a7030)",
           borderRadius: 2,
-          marginTop: 2,
           flexShrink: 0,
         }}
       />
@@ -149,17 +148,17 @@ export function SkLogoAnimated({ collapsed }: { collapsed: boolean }) {
           >
             <div style={{
               fontFamily: "var(--font-inter), 'Inter', sans-serif",
-              fontSize: 13,
+              fontSize: 9,
               fontWeight: 300,
               color: "#c9a050",
               letterSpacing: "0.08em",
-              marginBottom: 2,
+              marginBottom: 1,
             }}>
               subtle
             </div>
             <div style={{
               fontFamily: "var(--font-inter), 'Inter', sans-serif",
-              fontSize: 30,
+              fontSize: 19,
               fontWeight: 900,
               color: "#ffffff",
               letterSpacing: "-0.01em",
@@ -168,7 +167,7 @@ export function SkLogoAnimated({ collapsed }: { collapsed: boolean }) {
               alignItems: "center",
             }}>
               <span>KITCH</span>
-              <Leaf size={30} />
+              <Leaf size={19} />
               <span>N</span>
             </div>
           </motion.div>
