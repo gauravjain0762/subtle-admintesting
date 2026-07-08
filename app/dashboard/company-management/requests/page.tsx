@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Montserrat } from "next/font/google";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Eye, Check, MoreVertical, Sparkles, X as XIcon } from "lucide-react";
+import { Search, Eye, Check, MoreVertical, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
-  getEnquiries, approveEnquiry, rejectEnquiry, generateEnquiryCode, employeeRangeLabel,
+  getEnquiries, approveEnquiry, rejectEnquiry, employeeRangeLabel,
   type Enquiry,
 } from "@/lib/enquiries-store";
 import { LOGO_COLORS } from "@/lib/companies-store";
@@ -39,7 +39,6 @@ export default function CompanyRequestsPage() {
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [search, setSearch] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
 
   const refresh = () => setEnquiries(getEnquiries());
   useEffect(() => { refresh(); }, []);
@@ -62,18 +61,6 @@ export default function CompanyRequestsPage() {
     rejectEnquiry(e.id);
     refresh();
     toast.error(`"${e.workspaceName}" rejected`);
-  };
-
-  const handleGenerateCode = async (e: Enquiry, ev: React.MouseEvent) => {
-    ev.stopPropagation();
-    setGeneratingId(e.id);
-    try {
-      const code = await generateEnquiryCode(e.id);
-      refresh();
-      toast.success(`Code generated for "${e.workspaceName}": ${code}`);
-    } finally {
-      setGeneratingId(null);
-    }
   };
 
   return (
@@ -117,7 +104,7 @@ export default function CompanyRequestsPage() {
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: M.surface }}>
-                {["Company", "Company Code", "Details", "Business Type", "Total Employees", "Address", "Actions"].map((h) => (
+                {["Company", "Details", "Business Type", "Total Employees", "Address", "Actions"].map((h) => (
                   <th
                     key={h}
                     className="whitespace-nowrap px-3.5 py-3 text-left text-[8.5px] font-bold uppercase tracking-[0.1em]"
@@ -152,36 +139,6 @@ export default function CompanyRequestsPage() {
                         <p className="text-[10.5px]" style={{ color: M.textMuted }}>{e.businessType}</p>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-3.5 py-3.5">
-                    {e.code ? (
-                      <span
-                        className="inline-flex items-center rounded-md px-3 py-1.5 font-mono text-[11.5px] font-bold tracking-wider"
-                        style={{ background: M.surface, color: M.gold, border: `1px dashed ${M.border}` }}
-                      >
-                        {e.code}
-                      </span>
-                    ) : (
-                      <button
-                        onClick={(ev) => handleGenerateCode(e, ev)}
-                        disabled={generatingId === e.id}
-                        className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition-colors disabled:opacity-60"
-                        style={{ border: `1px solid ${M.gold}`, color: M.gold, background: "transparent" }}
-                        onMouseEnter={(ev) => { if (generatingId !== e.id) { (ev.currentTarget as HTMLElement).style.background = M.gold; (ev.currentTarget as HTMLElement).style.color = "#000000"; } }}
-                        onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.background = "transparent"; (ev.currentTarget as HTMLElement).style.color = M.gold; }}
-                      >
-                        {generatingId === e.id ? (
-                          <>
-                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                            Generating…
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles size={12} /> Generate Code
-                          </>
-                        )}
-                      </button>
-                    )}
                   </td>
                   <td className="px-3.5 py-3.5">
                     <p className="text-[12.5px] font-semibold" style={{ color: "#cccccc" }}>{e.firstName} {e.lastName}</p>

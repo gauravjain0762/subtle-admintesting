@@ -1,4 +1,4 @@
-import { addCompany, generateCode, LOGO_COLORS } from "@/lib/companies-store";
+import { addCompany, LOGO_COLORS } from "@/lib/companies-store";
 
 export type EnquiryStatus = "new" | "approved" | "rejected";
 
@@ -19,7 +19,6 @@ export interface Enquiry {
   deliveryTimes: string[];
   dateISO: string;
   status: EnquiryStatus;
-  code: string;
 }
 
 const INITIAL_ENQUIRIES: Enquiry[] = [
@@ -29,7 +28,7 @@ const INITIAL_ENQUIRIES: Enquiry[] = [
     businessType: "Logistics", totalEmployees: 40,
     address: "14 Dockside Road", town: "Poole", city: "Poole", postcode: "BH15 1TF", country: "United Kingdom",
     deliveryTimes: ["12:30 PM"],
-    dateISO: "2025-07-01", status: "new", code: "",
+    dateISO: "2025-07-01", status: "new",
   },
   {
     id: "ENQ-002", workspaceName: "Harbor Design Co.",
@@ -37,7 +36,7 @@ const INITIAL_ENQUIRIES: Enquiry[] = [
     businessType: "Design Studio", totalEmployees: 18,
     address: "6 Quay Street", town: "Poole", city: "Poole", postcode: "BH15 1HH", country: "United Kingdom",
     deliveryTimes: ["12:00 PM"],
-    dateISO: "2025-06-30", status: "new", code: "",
+    dateISO: "2025-06-30", status: "new",
   },
   {
     id: "ENQ-003", workspaceName: "Bourne Auto Repairs",
@@ -45,7 +44,7 @@ const INITIAL_ENQUIRIES: Enquiry[] = [
     businessType: "Automotive / Garage", totalEmployees: 12,
     address: "22 Wessex Way", town: "Bournemouth", city: "Bournemouth", postcode: "BH1 2AA", country: "United Kingdom",
     deliveryTimes: ["1:00 PM"],
-    dateISO: "2025-06-28", status: "new", code: "",
+    dateISO: "2025-06-28", status: "new",
   },
   {
     id: "ENQ-004", workspaceName: "Solent Marine Supplies",
@@ -53,7 +52,7 @@ const INITIAL_ENQUIRIES: Enquiry[] = [
     businessType: "Retail / Marine", totalEmployees: 25,
     address: "3 Harbourside", town: "Poole", city: "Poole", postcode: "BH15 1SU", country: "United Kingdom",
     deliveryTimes: ["12:30 PM"],
-    dateISO: "2025-06-24", status: "approved", code: "",
+    dateISO: "2025-06-24", status: "approved",
   },
 ];
 
@@ -66,7 +65,7 @@ function load(): Enquiry[] {
     if (!raw) return [...INITIAL_ENQUIRIES];
     const parsed = JSON.parse(raw) as Partial<Enquiry>[];
     return parsed.map((e) => ({
-      code: "", phone: "", town: "", city: "", postcode: "", country: "United Kingdom", deliveryTimes: [],
+      phone: "", town: "", city: "", postcode: "", country: "United Kingdom", deliveryTimes: [],
       ...e,
     } as Enquiry));
   } catch {
@@ -109,24 +108,6 @@ export function rejectEnquiry(id: string): void {
   save(load().map((e) => (e.id === id ? { ...e, status: "rejected" } : e)));
 }
 
-export function setEnquiryCode(id: string, code: string): void {
-  save(load().map((e) => (e.id === id ? { ...e, code } : e)));
-}
-
-/**
- * Generates a company code for an enquiry ahead of approval.
- * Wrapped as an async call (simulated network delay) so it's a drop-in
- * swap for a real "generate code" API endpoint later.
- */
-export async function generateEnquiryCode(id: string): Promise<string> {
-  await new Promise((resolve) => setTimeout(resolve, 700));
-  const enquiry = getEnquiry(id);
-  if (!enquiry) throw new Error("Enquiry not found");
-  const code = generateCode(enquiry.workspaceName);
-  setEnquiryCode(id, code);
-  return code;
-}
-
 /** Approves the enquiry and creates a matching Company record from it. */
 export function approveEnquiry(id: string): void {
   const enquiry = getEnquiry(id);
@@ -139,7 +120,7 @@ export function approveEnquiry(id: string): void {
   addCompany({
     id: companyId,
     name: enquiry.workspaceName,
-    code: enquiry.code || generateCode(enquiry.workspaceName),
+    code: "",
     industry: enquiry.businessType,
     contact: `${enquiry.firstName} ${enquiry.lastName}`,
     email: enquiry.email,

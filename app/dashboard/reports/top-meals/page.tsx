@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Montserrat } from "next/font/google";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, UtensilsCrossed } from "lucide-react";
 import { getOrders, type Order } from "@/lib/orders-store";
 import { getDishes, type Dish } from "@/lib/menu-store";
 
@@ -97,7 +97,14 @@ export default function TopMealsReportPage() {
                 >
                   {i + 1}
                 </span>
-                <span className="text-lg">{dish.img}</span>
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: M.surface, border: `1px solid ${M.border}` }}>
+                  {dish.images[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={dish.images[0]} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <UtensilsCrossed size={12} style={{ color: M.textMuted }} />
+                  )}
+                </div>
                 <span className="min-w-0 flex-1 truncate text-[13px] font-semibold" style={{ color: M.white }}>
                   {dish.name}
                 </span>

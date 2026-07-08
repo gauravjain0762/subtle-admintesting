@@ -6,6 +6,7 @@ import { Montserrat } from "next/font/google";
 import {
   LayoutDashboard,
   Building2,
+  UtensilsCrossed,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -37,6 +38,7 @@ const NAV: NavEntry[] = [
       { label: "Company Request", href: "/dashboard/company-management/requests" },
     ],
   },
+  { label: "Meal Management", href: "/dashboard/menu", icon: UtensilsCrossed },
 ];
 
 interface SidebarProps {
@@ -239,7 +241,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
 
   const isActive = (href: string) =>
-    href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href);
+    href === "/dashboard" ? pathname === "/dashboard" : (pathname === href || pathname.startsWith(href + "/"));
 
   return (
     <div

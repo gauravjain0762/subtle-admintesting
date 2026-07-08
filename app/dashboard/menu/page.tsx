@@ -1,60 +1,123 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Edit2, Trash2, Star, Flame, X, Leaf as LeafIcon } from "lucide-react";
+import { Montserrat } from "next/font/google";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  UtensilsCrossed, CircleCheck,
+  Search, Eye, Edit2, Trash2, MoreVertical,
+  BadgeCheck, XCircle, X,
+} from "lucide-react";
 import { toast } from "sonner";
-import { getDishes, toggleDishAvailable, deleteDish, TAG_COLORS, type Dish } from "@/lib/menu-store";
-import { getMenus, getDefaultMenu, type Menu } from "@/lib/menus-store";
-import { SKToggle } from "@/components/ui/sk-toggle";
-import { C } from "@/lib/sk-theme";
+import { getDishes, toggleDishAvailable, deleteDish, type Dish } from "@/lib/menu-store";
+import { getMenus, type Menu } from "@/lib/menus-store";
 
-/* ── Delete dialog ──────────────────────────────────────────────── */
-function DeleteDialog({
-  dish, onConfirm, onCancel,
-}: { dish: Dish; onConfirm: () => void; onCancel: () => void }) {
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+/* ── Mentor project reference palette (matches companies/page.tsx) ── */
+const M = {
+  panel: "#0d0d0d",
+  surface: "#111111",
+  border: "#1e1e1e",
+  borderFaint: "#131313",
+  gold: "#f8e396",
+  goldMuted: "rgba(248,227,150,0.6)",
+  goldFaint: "rgba(248,227,150,0.28)",
+  white: "#ffffff",
+  textMuted: "#888888",
+  textFaint: "#444444",
+  green: "#22c55e",
+  red: "#ff6b6b",
+};
+
+const STATUS_CFG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  available:   { label: "Available",   color: M.green, icon: BadgeCheck },
+  unavailable: { label: "Unavailable", color: M.red,   icon: XCircle },
+};
+
+/* ── Animation variants ─────────────────────────────────────────── */
+const cardVariants = {
+  hidden: { opacity: 0, y: 24, scale: 0.97 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
+};
+const rowVariants = {
+  hidden: { opacity: 0, x: -12 },
+  show: (i: number) => ({
+    opacity: 1, x: 0,
+    transition: { delay: i * 0.04, duration: 0.35, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
+  }),
+};
+
+/* ── Stat card (mentor style: left accent bar) ── */
+function StatCard({ label, value, icon: Icon, accent }: {
+  label: string; value: string | number;
+  icon: React.ElementType; accent: string;
+}) {
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      variants={cardVariants}
+      whileHover={{ y: -2 }}
+      className="rounded-lg p-5"
+      style={{ background: M.panel, border: `1px solid ${M.border}`, borderLeft: `3px solid ${accent}` }}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: M.textFaint }}>{label}</p>
+          <p className="mt-3 text-[28px] font-bold leading-none" style={{ color: M.white }}>{value}</p>
+        </div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: M.surface }}>
+          <Icon size={16} style={{ color: accent }} strokeWidth={1.8} />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ── Delete dialog ──────────────────────────────────────────────── */
+function DeleteDialog({ dish, onConfirm, onCancel }: { dish: Dish; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+      className={`fixed inset-0 z-[80] flex items-center justify-center p-4 ${montserrat.className}`}
+      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
       onClick={onCancel}
     >
       <motion.div
-        initial={{ scale: 0.92, opacity: 0, y: 12 }}
+        initial={{ scale: 0.94, opacity: 0, y: 12 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.94, opacity: 0 }}
+        exit={{ scale: 0.96, opacity: 0 }}
         transition={{ type: "spring", stiffness: 420, damping: 30 }}
-        className="w-full max-w-[400px] rounded-2xl p-7"
-        style={{ background: C.white, border: `1.5px solid ${C.cardBorder}`, boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}
+        className="w-full max-w-[400px] rounded-xl p-7"
+        style={{ background: M.panel, border: `1px solid ${M.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: C.redBg }}>
-          <Trash2 size={22} style={{ color: C.red }} />
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: "#2a0a0a" }}>
+          <Trash2 size={20} style={{ color: M.red }} />
         </div>
-        <h2 className="text-[17px] font-bold" style={{ color: C.text }}>Delete dish?</h2>
-        <p className="mt-2 text-[13px] leading-relaxed" style={{ color: C.textSub }}>
-          <span className="font-semibold" style={{ color: C.text }}>{dish.img} {dish.name}</span>{" "}
+        <h2 className="text-[16px] font-bold" style={{ color: M.white }}>Delete dish?</h2>
+        <p className="mt-2 text-[13px] leading-relaxed" style={{ color: M.textMuted }}>
+          <span className="font-semibold" style={{ color: M.white }}>{dish.name}</span>{" "}
           will be permanently removed from the menu. This cannot be undone.
         </p>
         <div className="mt-6 flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 rounded-xl py-2.5 text-[13px] font-semibold transition-colors"
-            style={{ border: `1.5px solid ${C.cardBorder}`, color: C.textSub }}
-            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = C.muted)}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "")}
+            className="flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors"
+            style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.border; (e.currentTarget as HTMLElement).style.color = M.textMuted; }}
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 rounded-xl py-2.5 text-[13px] font-bold transition-opacity hover:opacity-90"
-            style={{ background: C.red, color: C.white }}
+            className="flex-1 rounded-lg py-2.5 text-[13px] font-bold transition-opacity hover:opacity-90"
+            style={{ background: M.red, color: "#000000" }}
           >
             Delete dish
           </button>
@@ -64,174 +127,39 @@ function DeleteDialog({
   );
 }
 
-/* ── Dish card ──────────────────────────────────────────────────── */
-function DishCard({
-  dish, onToggle, onEdit, onDelete,
-}: {
-  dish: Dish; onToggle: () => void; onEdit: () => void; onDelete: () => void;
-}) {
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 22, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.94, y: 8 }}
-      transition={{ type: "spring", stiffness: 340, damping: 28 }}
-      whileHover={{ y: -5, boxShadow: "0 16px 48px rgba(0,0,0,0.10)", scale: 1.012 }}
-      className="relative flex flex-col overflow-hidden rounded-2xl"
-      style={{
-        background: C.white,
-        border: `1.5px solid ${C.cardBorder}`,
-        opacity: dish.available ? 1 : 0.62,
-      }}
-    >
-      {/* Emoji area */}
-      <motion.div
-        className="relative flex h-[108px] items-center justify-center text-6xl select-none"
-        style={{ background: C.muted }}
-        whileHover={{ background: "#ede3c8" }}
-        transition={{ duration: 0.2 }}
-      >
-        <motion.span
-          whileHover={{ scale: 1.18, rotate: [-2, 2, -1, 0] }}
-          transition={{ type: "spring", stiffness: 380, damping: 18, rotate: { duration: 0.4 } }}
-          className="inline-block"
-        >
-          {dish.img}
-        </motion.span>
-
-        {dish.popular && (
-          <motion.span
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="absolute right-2 top-2 flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold"
-            style={{ background: C.yellow, color: C.black }}
-          >
-            <Flame size={9} /> Popular
-          </motion.span>
-        )}
-        {dish.vegan && (
-          <motion.span
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="absolute left-2 top-2 flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold"
-            style={{ background: C.greenBg, color: C.green }}
-          >
-            <LeafIcon size={9} /> Vegan
-          </motion.span>
-        )}
-
-        {!dish.available && (
-          <div
-            className="absolute inset-0 flex items-center justify-center rounded-t-2xl"
-            style={{ background: "rgba(255,255,255,0.6)" }}
-          >
-            <span className="rounded-full px-3 py-1 text-[11px] font-bold" style={{ background: C.cardBorder, color: C.textSub }}>
-              Unavailable
-            </span>
-          </div>
-        )}
-      </motion.div>
-
-      {/* Content */}
-      <div className="flex flex-1 flex-col p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-[13.5px] font-bold leading-tight" style={{ color: C.text }}>{dish.name}</h3>
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className="text-[11px]" style={{ color: C.textMuted }}>{dish.kcal} kcal</span>
-              <span style={{ color: "#d0c8b0" }}>·</span>
-              <span className="text-[11px]" style={{ color: C.textMuted }}>{dish.protein}g protein</span>
-            </div>
-          </div>
-          <span className="shrink-0 text-[15px] font-bold" style={{ color: C.text }}>£{dish.price}</span>
-        </div>
-
-        <div className="mt-2 flex flex-wrap gap-1">
-          {dish.tags.map((t) => (
-            <span key={t} className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-              style={TAG_COLORS[t] ?? { background: C.muted, color: C.textSub }}>
-              {t}
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-3 flex items-center gap-3 border-t pt-3" style={{ borderColor: C.muted }}>
-          <div className="flex items-center gap-1">
-            <Star size={11} fill={C.yellow} style={{ color: C.yellow }} />
-            <span className="text-[12px] font-bold" style={{ color: C.text }}>{dish.rating}</span>
-          </div>
-          <span className="text-[11px]" style={{ color: C.textMuted }}>{dish.orders} orders</span>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-[10.5px] font-medium" style={{ color: dish.available ? C.green : C.textMuted }}>
-              {dish.available ? "Live" : "Off"}
-            </span>
-            <SKToggle on={dish.available} onChange={onToggle} stopPropagation />
-          </div>
-        </div>
-
-        <div className="mt-3 flex gap-2">
-          <motion.button
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
-            onClick={onEdit}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-[11.5px] font-semibold"
-            style={{ border: `1.5px solid ${C.cardBorder}`, color: C.text, background: C.inputBg }}
-          >
-            <Edit2 size={11} /> Edit
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.08, background: C.redBg }}
-            whileTap={{ scale: 0.92 }}
-            onClick={onDelete}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-            style={{ border: `1.5px solid ${C.cardBorder}`, color: C.red }}
-          >
-            <Trash2 size={13} />
-          </motion.button>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 /* ── Page ───────────────────────────────────────────────────────── */
 export default function MenuPage() {
   const router = useRouter();
   const [dishes,       setDishes]       = useState<Dish[]>([]);
   const [menus,        setMenus]        = useState<Menu[]>([]);
-  const [selectedMenuId, setSelectedMenuId] = useState("standard");
+  const [menuFilter,   setMenuFilter]   = useState<"all" | "standard" | "custom">("all");
   const [search,       setSearch]       = useState("");
-  const [filter,       setFilter]       = useState<"all" | "available" | "unavailable">("all");
+  const [openMenuId,   setOpenMenuId]   = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Dish | null>(null);
 
   useEffect(() => {
     setDishes(getDishes());
     setMenus(getMenus());
-    const params = new URLSearchParams(window.location.search);
-    const requestedMenuId = params.get("menuId");
-    setSelectedMenuId(requestedMenuId ?? getDefaultMenu().id);
   }, []);
 
-  const menuDishes = useMemo(
-    () => dishes.filter((d) => (d.menuId ?? "standard") === selectedMenuId),
-    [dishes, selectedMenuId]
-  );
+  const menuTypeOf = (menuId: string): "standard" | "custom" =>
+    menus.find((m) => m.id === menuId)?.isDefault ? "standard" : "custom";
 
-  const filtered = menuDishes.filter((d) => {
+  const filtered = dishes.filter((d) => {
     const q = search.toLowerCase();
-    const matchSearch = !search || d.name.toLowerCase().includes(q) || d.tags.some((t) => t.toLowerCase().includes(q));
-    const matchFilter = filter === "all" || (filter === "available" ? d.available : !d.available);
-    return matchSearch && matchFilter;
+    const matchSearch = !search || d.name.toLowerCase().includes(q) || d.category.toLowerCase().includes(q);
+    const matchMenu = menuFilter === "all" || menuTypeOf(d.menuId ?? "standard") === menuFilter;
+    return matchSearch && matchMenu;
   });
 
-  const selectedMenu = menus.find((m) => m.id === selectedMenuId);
+  const available   = dishes.filter((d) => d.available);
+  const unavailable = dishes.filter((d) => !d.available);
 
-  const handleToggle = (id: number) => {
-    const next = toggleDishAvailable(id);
+  const handleToggle = (dish: Dish) => {
+    const next = toggleDishAvailable(dish.id);
     setDishes(getDishes());
-    const dish = dishes.find((d) => d.id === id);
-    if (dish) toast.success(`"${dish.name}" marked ${next ? "available" : "unavailable"}`);
+    setOpenMenuId(null);
+    toast.success(`"${dish.name}" marked ${next ? "available" : "unavailable"}`);
   };
 
   const handleDelete = () => {
@@ -243,133 +171,291 @@ export default function MenuPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className={`space-y-6 ${montserrat.className}`}>
       {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: -14 }}
+        initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-        className="flex flex-wrap items-center justify-between gap-4"
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className="flex flex-wrap items-start justify-between gap-4"
       >
         <div>
-          <h1 className="text-[22px] font-bold" style={{ color: C.text }}>Menu</h1>
-          <p className="text-[13px]" style={{ color: C.textSub }}>
-            {menuDishes.filter((d) => d.available).length} of {menuDishes.length} dishes live in {selectedMenu?.name ?? "Standard Menu"}
-          </p>
+          <h1 className="text-[26px] font-bold tracking-tight" style={{ color: M.gold }}>Standard Menu</h1>
+          <p className="mt-0.5 text-[12px]" style={{ color: "#D0C5AF" }}>Dishes available across standard and custom menus</p>
         </div>
         <motion.button
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={() => router.push(`/dashboard/menu/new?menuId=${selectedMenuId}`)}
-          className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold shadow-sm transition-shadow hover:shadow-md"
-          style={{ background: C.black, color: C.white }}
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => router.push("/dashboard/menu/new")}
+          className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-[11px] font-extrabold uppercase tracking-wider transition-colors"
+          style={{ border: `1.5px solid ${M.gold}`, color: M.gold, background: "transparent" }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.gold; (e.currentTarget as HTMLElement).style.color = "#000000"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.gold; }}
         >
-          <Plus size={15} /> Add Dish
+          <UtensilsCrossed size={13} /> Add Dish
         </motion.button>
       </motion.div>
 
-      {/* Menu selector */}
+      {/* Stat cards */}
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05, duration: 0.34 }}
-        className="flex flex-wrap items-center gap-1.5"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.07 } } }}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-3"
       >
-        {menus.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => setSelectedMenuId(m.id)}
-            className="rounded-xl px-4 py-2 text-[12px] font-semibold transition-all"
-            style={{
-              background: selectedMenuId === m.id ? C.black : C.white,
-              color:      selectedMenuId === m.id ? C.white : C.textSub,
-              border:     `1.5px solid ${C.cardBorder}`,
-            }}
-          >
-            {m.name}
-          </button>
-        ))}
-        <button
-          onClick={() => router.push("/dashboard/menus")}
-          className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-semibold transition-all"
-          style={{ color: C.textSub, border: `1.5px dashed ${C.cardBorder}` }}
-        >
-          <Plus size={12} /> New Menu
-        </button>
+        <StatCard label="Total Dishes" value={dishes.length}       icon={UtensilsCrossed} accent={M.textMuted} />
+        <StatCard label="Available"    value={available.length}   icon={CircleCheck}     accent={M.green} />
+        <StatCard label="Unavailable"  value={unavailable.length} icon={XCircle}         accent={M.red} />
       </motion.div>
 
-      {/* Filters */}
+      {/* Menu type filter */}
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08, duration: 0.34 }}
-        className="flex flex-wrap items-center gap-3"
+        transition={{ delay: 0.1, duration: 0.4 }}
+        className="flex overflow-hidden rounded-lg border w-fit"
+        style={{ borderColor: M.goldFaint }}
+      >
+        {(["all", "standard", "custom"] as const).map((v, i) => (
+          <button
+            key={v}
+            onClick={() => setMenuFilter(v)}
+            className="px-4 py-2 text-[11.5px] font-bold whitespace-nowrap transition-colors"
+            style={{
+              background: menuFilter === v ? M.gold : "transparent",
+              color:      menuFilter === v ? "#000000" : M.gold,
+              borderRight: i < 2 ? `1px solid rgba(248,227,150,0.2)` : "none",
+            }}
+            onMouseEnter={(e) => { if (menuFilter !== v) (e.currentTarget as HTMLElement).style.background = "rgba(248,227,150,0.08)"; }}
+            onMouseLeave={(e) => { if (menuFilter !== v) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
+            {v === "all" ? "All" : v === "standard" ? "Standard Menu" : "Custom Menu"}
+          </button>
+        ))}
+      </motion.div>
+
+      {/* Search */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15, duration: 0.4 }}
+        className="flex flex-wrap gap-3"
       >
         <div
-          className="flex min-w-[180px] flex-1 items-center gap-2.5 rounded-xl px-3.5 py-2.5"
-          style={{ border: `1.5px solid ${C.cardBorder}`, background: C.white }}
+          className="flex min-w-[220px] flex-1 items-center gap-2.5 rounded-lg px-4 py-2.5"
+          style={{ border: `1px solid ${M.border}`, background: M.panel }}
         >
-          <Search size={14} style={{ color: C.textMuted }} />
+          <Search size={14} style={{ color: M.textFaint }} />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search dishes or tags…"
+            placeholder="Search dishes or category…"
             className="flex-1 bg-transparent text-[13px] outline-none"
-            style={{ color: C.text }}
+            style={{ color: M.white }}
           />
           {search && (
-            <button onClick={() => setSearch("")} style={{ color: C.textMuted }}>
+            <button onClick={() => setSearch("")} style={{ color: M.textMuted }}>
               <X size={13} />
             </button>
           )}
         </div>
-        <div className="flex gap-1.5">
-          {(["all", "available", "unavailable"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setFilter(v)}
-              className="rounded-xl px-4 py-2.5 text-[12px] font-semibold capitalize transition-all"
-              style={{
-                background: filter === v ? C.black : C.white,
-                color:      filter === v ? C.white : C.textSub,
-                border:     `1.5px solid ${C.cardBorder}`,
-              }}
-            >
-              {v === "all" ? "All" : v.charAt(0).toUpperCase() + v.slice(1)}
-            </button>
-          ))}
+      </motion.div>
+
+      {/* Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.45 }}
+        className="overflow-hidden rounded-xl"
+        style={{ background: M.panel, border: `1px solid ${M.border}` }}
+      >
+        <div className="px-6 py-4" style={{ borderBottom: `1px solid ${M.border}` }}>
+          <p className="text-[13px] font-bold" style={{ color: M.white }}>Dish Directory</p>
+          <p className="text-[11.5px]" style={{ color: M.textMuted }}>
+            {filtered.length} {filtered.length === 1 ? "dish" : "dishes"} found
+          </p>
         </div>
-      </motion.div>
 
-      {/* Cards grid */}
-      <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        <AnimatePresence mode="popLayout">
-          {filtered.map((dish) => (
-            <DishCard
-              key={dish.id}
-              dish={dish}
-              onToggle={() => handleToggle(dish.id)}
-              onEdit={() => router.push(`/dashboard/menu/${dish.id}`)}
-              onDelete={() => setDeleteTarget(dish)}
-            />
-          ))}
-        </AnimatePresence>
-      </motion.div>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr style={{ background: M.surface }}>
+                {["Dish", "Category", "Price", "Nutrition", "Menu Type", "Status", "Actions"].map((h) => (
+                  <th key={h}
+                    className="whitespace-nowrap px-5 py-3 text-left text-[8.5px] font-bold uppercase tracking-[0.12em]"
+                    style={{ color: M.goldMuted, borderBottom: `1px solid ${M.border}` }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <AnimatePresence mode="popLayout">
+                {filtered.map((dish, i) => {
+                  const sd = STATUS_CFG[dish.available ? "available" : "unavailable"];
+                  const StatusIcon = sd.icon;
+                  const type = menuTypeOf(dish.menuId ?? "standard");
+                  return (
+                    <motion.tr
+                      key={dish.id}
+                      layout
+                      custom={i}
+                      variants={rowVariants}
+                      initial="hidden"
+                      animate="show"
+                      exit={{ opacity: 0, x: 12 }}
+                      className="group cursor-pointer transition-colors"
+                      style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${M.borderFaint}` : "none" }}
+                      onClick={() => router.push(`/dashboard/menu/${dish.id}`)}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "")}
+                    >
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <motion.div
+                            whileHover={{ scale: 1.1, rotate: 3 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                            className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg"
+                            style={{ background: M.surface, border: `1px solid ${M.border}` }}
+                          >
+                            {dish.images[0] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={dish.images[0]} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <UtensilsCrossed size={14} style={{ color: M.textFaint }} />
+                            )}
+                          </motion.div>
+                          <div>
+                            <p className="text-[13px] font-bold" style={{ color: M.white }}>{dish.name}</p>
+                            <p className="text-[10.5px]" style={{ color: M.textMuted }}>
+                              {dish.orders} orders · ★ {dish.rating}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
 
-      {filtered.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex flex-col items-center gap-3 py-20"
-        >
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl text-3xl" style={{ background: C.muted }}>
-            🍽️
+                      <td className="px-5 py-4">
+                        <span className="text-[12px] font-semibold" style={{ color: "#cccccc" }}>{dish.category}</span>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span className="text-[13px] font-bold" style={{ color: M.gold }}>£{dish.price}</span>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span className="text-[12px]" style={{ color: "#cccccc" }}>{dish.kcal} kcal</span>
+                        <span className="mx-1" style={{ color: M.textFaint }}>·</span>
+                        <span className="text-[12px]" style={{ color: "#cccccc" }}>{dish.protein}g protein</span>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span
+                          className="inline-flex items-center rounded-md px-2.5 py-1 text-[10.5px] font-bold"
+                          style={{ border: `1px solid ${M.goldFaint}`, color: M.gold }}
+                        >
+                          {type === "standard" ? "Standard" : "Custom"}
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10.5px] font-bold"
+                          style={{ border: `1px solid ${sd.color}`, color: sd.color }}
+                        >
+                          <StatusIcon size={10} />
+                          {sd.label}
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => setOpenMenuId((v) => (v === dish.id ? null : dish.id))}
+                            className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                            style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = M.textMuted; (e.currentTarget as HTMLElement).style.borderColor = M.border; }}
+                            aria-label="Actions"
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+
+                          <AnimatePresence>
+                            {openMenuId === dish.id && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                                transition={{ duration: 0.14 }}
+                                className="absolute right-0 top-[calc(100%+6px)] z-[90] min-w-[170px] rounded-lg p-1.5"
+                                style={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
+                              >
+                                <button
+                                  onClick={() => { setOpenMenuId(null); router.push(`/dashboard/menu/${dish.id}`); }}
+                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                                  style={{ color: "#aaaaaa" }}
+                                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+                                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
+                                >
+                                  <Eye size={13} /> View
+                                </button>
+                                <button
+                                  onClick={() => { setOpenMenuId(null); router.push(`/dashboard/menu/${dish.id}`); }}
+                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                                  style={{ color: "#aaaaaa" }}
+                                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+                                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
+                                >
+                                  <Edit2 size={13} /> Edit
+                                </button>
+
+                                <div className="my-1 h-px" style={{ background: M.border }} />
+                                <button
+                                  onClick={() => handleToggle(dish)}
+                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                                  style={{ color: dish.available ? M.red : M.green }}
+                                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
+                                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                                >
+                                  {dish.available
+                                    ? <><XCircle size={13} /> Unavailable</>
+                                    : <><BadgeCheck size={13} /> Available</>}
+                                </button>
+
+                                <div className="my-1 h-px" style={{ background: M.border }} />
+                                <button
+                                  onClick={() => { setOpenMenuId(null); setDeleteTarget(dish); }}
+                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                                  style={{ color: M.red }}
+                                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
+                                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                                >
+                                  <Trash2 size={13} /> Delete
+                                </button>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </AnimatePresence>
+            </tbody>
+          </table>
+        </div>
+
+        {filtered.length === 0 && (
+          <div className="flex flex-col items-center gap-3 py-16">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl" style={{ background: M.surface }}>
+              <UtensilsCrossed size={24} style={{ color: M.textMuted }} />
+            </div>
+            <p className="text-[13px] font-semibold" style={{ color: M.white }}>No dishes found</p>
+            <p className="text-[12px]" style={{ color: M.textMuted }}>Try a different search or filter</p>
           </div>
-          <p className="text-[14px] font-bold" style={{ color: C.text }}>No dishes found</p>
-          <p className="text-[12.5px]" style={{ color: C.textMuted }}>Try a different search or filter</p>
-        </motion.div>
-      )}
+        )}
+      </motion.div>
 
       {/* Delete dialog */}
       <AnimatePresence>

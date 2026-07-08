@@ -8,6 +8,7 @@ export interface Menu {
 
 const INITIAL_MENUS: Menu[] = [
   { id: "standard", name: "Standard Menu", description: "Default menu served to most companies, Monday–Friday.", isDefault: true, createdAt: "Jan 2024" },
+  { id: "corporate-wellness", name: "Custom Menu", description: "Lower-calorie, macro-balanced dishes for wellness-focused corporate clients.", isDefault: false, createdAt: "Mar 2025" },
 ];
 
 const KEY = "sk_admin_menus";

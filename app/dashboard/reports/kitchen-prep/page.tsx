@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { ChefHat, ShoppingBag, Scale } from "lucide-react";
+import { ChefHat, ShoppingBag, Scale, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { getTodaysOrders, type Order } from "@/lib/orders-store";
 import { getDishes, type Dish } from "@/lib/menu-store";
@@ -174,7 +174,14 @@ export default function KitchenPrepPage() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-xl">{row.dish.img}</span>
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: C.muted }}>
+                        {row.dish.images[0] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={row.dish.images[0]} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <UtensilsCrossed size={12} style={{ color: C.textMuted }} />
+                        )}
+                      </div>
                       <span className="truncate text-[13px] font-bold" style={{ color: C.text }}>{row.dish.name}</span>
                     </div>
                     <span className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: C.yellow, color: C.black }}>
