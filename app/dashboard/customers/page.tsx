@@ -117,7 +117,7 @@ export default function CustomersPage() {
 
       {/* Table */}
       <div className="overflow-hidden rounded-2xl" style={{ background: "#ffffff", border: "1.5px solid #e8e0cc" }}>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-hidden">
           <table className="w-full">
             <thead>
               <tr style={{ borderBottom: "1.5px solid #f0e9d6" }}>

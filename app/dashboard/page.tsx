@@ -132,7 +132,7 @@ export default function DashboardPage() {
     setAllOrders(orders);
     setMenus(getMenus());
     setDishes(getDishes());
-    setNewEnquiries(getNewEnquiriesCount());
+    getNewEnquiriesCount().then(setNewEnquiries).catch(() => setNewEnquiries(0));
     setActiveSubs(getActiveWeeklySubscriptionsCount());
   }, []);
 

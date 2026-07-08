@@ -105,10 +105,13 @@ export default function MenusPage() {
 
   const refresh = () => {
     const allMenus = getMenus();
-    const companies = getCompanies();
     setMenus(allMenus);
     setDishCounts(Object.fromEntries(allMenus.map((m) => [m.id, getDishesByMenu(m.id).length])));
-    setCompanyCounts(Object.fromEntries(allMenus.map((m) => [m.id, companies.filter((c) => c.menuId === m.id).length])));
+    getCompanies()
+      .then((companies) => {
+        setCompanyCounts(Object.fromEntries(allMenus.map((m) => [m.id, companies.filter((c) => c.menuId === m.id).length])));
+      })
+      .catch(() => setCompanyCounts({}));
   };
 
   useEffect(() => { refresh(); }, []);

@@ -277,7 +277,7 @@ export default function MenuPage() {
           </p>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-hidden">
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: M.surface }}>

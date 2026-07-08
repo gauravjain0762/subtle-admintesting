@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { Montserrat } from "next/font/google";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Building2, Users, ShoppingBag, TrendingUp,
+  Building2, Users, ShoppingBag,
   Search, Eye, Sparkles, MoreVertical,
   BadgeCheck, XCircle, X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getCompanies, generateCompanyCode, setCompanyStatus, type Company } from "@/lib/companies-store";
-import { employeeRangeLabel } from "@/lib/enquiries-store";
+import { getCompanies, setCompanyStatus, type Company } from "@/lib/companies-store";
+import { ApiError } from "@/lib/api/client";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -35,8 +35,8 @@ const M = {
 };
 
 const STATUS_CFG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  active:   { label: "Active",   color: M.green, icon: BadgeCheck },
-  inactive: { label: "Inactive", color: M.red,   icon: XCircle },
+  active:    { label: "Active",    color: M.green, icon: BadgeCheck },
+  suspended: { label: "Suspended", color: M.red,   icon: XCircle },
 };
 
 /* ── Animation variants ─────────────────────────────────────────── */
@@ -80,40 +80,38 @@ function StatCard({ label, value, icon: Icon, accent }: {
 /* ── Page ───────────────────────────────────────────────────────── */
 export default function CompaniesPage() {
   const router = useRouter();
-  const [companies,    setCompanies]    = useState<Company[]>([]);
-  const [search,       setSearch]       = useState("");
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [openMenuId,   setOpenMenuId]   = useState<string | null>(null);
+  const [companies,   setCompanies]   = useState<Company[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [search,      setSearch]      = useState("");
+  const [togglingId,  setTogglingId]  = useState<string | null>(null);
+  const [openMenuId,  setOpenMenuId]  = useState<string | null>(null);
 
-  useEffect(() => {
-    setCompanies(getCompanies());
-  }, []);
-
-  const handleSetStatus = (company: Company, status: Company["status"]) => {
-    setCompanyStatus(company.id, status);
-    setCompanies(getCompanies());
-    setOpenMenuId(null);
-    toast.success(`"${company.name}" marked ${status}`);
+  const refresh = () => {
+    setLoading(true);
+    getCompanies()
+      .then(setCompanies)
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to load companies"))
+      .finally(() => setLoading(false));
   };
+  useEffect(() => { refresh(); }, []);
 
-  const handleGenerateCode = async (company: Company, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setGeneratingId(company.id);
+  const handleSetStatus = async (company: Company, status: Company["status"]) => {
+    setOpenMenuId(null);
+    setTogglingId(company.id);
     try {
-      const code = await generateCompanyCode(company.id);
-      setCompanies(getCompanies());
-      toast.success(`Code generated for "${company.name}": ${code}`);
+      await setCompanyStatus(company.id, status);
+      refresh();
+      toast.success(`"${company.name}" marked ${status}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to update status");
     } finally {
-      setGeneratingId(null);
+      setTogglingId(null);
     }
   };
 
-  const active     = companies.filter((c) => c.status === "active");
-  const totalEmp   = companies.reduce((s, c) => s + c.employees, 0);
-  const totalSpend = active.reduce((s, c) => {
-    const n = parseFloat(c.monthlySpend.replace(/[£,]/g, ""));
-    return s + (isNaN(n) ? 0 : n);
-  }, 0);
+  const active      = companies.filter((c) => c.status === "active");
+  const totalUsers  = companies.reduce((s, c) => s + c.totalUsers, 0);
+  const totalOrders = companies.reduce((s, c) => s + c.activeOrders, 0);
 
   const filtered = companies.filter((c) => {
     const q = search.toLowerCase();
@@ -145,8 +143,8 @@ export default function CompaniesPage() {
       >
         <StatCard label="Total Companies"  value={companies.length} icon={Building2}  accent={M.textMuted} />
         <StatCard label="Active Companies" value={active.length}    icon={BadgeCheck} accent={M.green} />
-        <StatCard label="Total Employees"  value={totalEmp.toLocaleString()} icon={Users}       accent={M.gold} />
-        <StatCard label="Monthly Revenue"  value={`£${Math.round(totalSpend).toLocaleString()}`} icon={TrendingUp} accent={M.gold} />
+        <StatCard label="Total Users"      value={totalUsers.toLocaleString()}  icon={Users}       accent={M.gold} />
+        <StatCard label="Total Orders"     value={totalOrders.toLocaleString()} icon={ShoppingBag} accent={M.gold} />
       </motion.div>
 
       {/* Filters */}
@@ -192,7 +190,7 @@ export default function CompaniesPage() {
           </p>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-hidden">
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: M.surface }}>
@@ -221,7 +219,7 @@ export default function CompaniesPage() {
                       exit={{ opacity: 0, x: 12 }}
                       className="group cursor-pointer transition-colors"
                       style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${M.borderFaint}` : "none" }}
-                      onClick={() => router.push(`/dashboard/companies/${company.id}`)}
+                      onClick={() => router.push(`/dashboard/companies/detail?id=${company.id}`)}
                       onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "")}
                     >
@@ -252,36 +250,29 @@ export default function CompaniesPage() {
                           </span>
                         ) : (
                           <button
-                            onClick={(e) => handleGenerateCode(company, e)}
-                            disabled={generatingId === company.id}
-                            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition-colors disabled:opacity-60"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toast.error("Not supported by the current API yet — codes are only assigned on approval.");
+                            }}
+                            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold transition-colors"
                             style={{ border: `1px solid ${M.gold}`, color: M.gold, background: "transparent" }}
-                            onMouseEnter={(e) => { if (generatingId !== company.id) { (e.currentTarget as HTMLElement).style.background = M.gold; (e.currentTarget as HTMLElement).style.color = "#000000"; } }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.gold; (e.currentTarget as HTMLElement).style.color = "#000000"; }}
                             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.gold; }}
                           >
-                            {generatingId === company.id ? (
-                              <>
-                                <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                Generating…
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles size={12} /> Generate Code
-                              </>
-                            )}
+                            <Sparkles size={12} /> Generate Code
                           </button>
                         )}
                       </td>
 
                       <td className="px-5 py-4">
-                        <p className="text-[12px] font-semibold" style={{ color: "#cccccc" }}>{company.contact}</p>
-                        <p className="text-[10.5px]" style={{ color: M.textFaint }}>{company.email}</p>
+                        <p className="text-[12px] font-semibold" style={{ color: "#cccccc" }}>{company.contact || "—"}</p>
+                        <p className="text-[10.5px]" style={{ color: M.textFaint }}>{company.email || "—"}</p>
                       </td>
 
                       <td className="px-5 py-4">
-                        <div className="flex items-center gap-1.5" title={`${company.employees} employees`}>
+                        <div className="flex items-center gap-1.5">
                           <Users size={13} style={{ color: M.textFaint }} />
-                          <span className="text-[13px] font-semibold" style={{ color: M.white }}>{employeeRangeLabel(company.employees)}</span>
+                          <span className="text-[13px] font-semibold" style={{ color: M.white }}>{company.employees || "—"}</span>
                         </div>
                       </td>
 
@@ -293,7 +284,7 @@ export default function CompaniesPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <span className="text-[13px] font-bold" style={{ color: M.gold }}>{company.monthlySpend}</span>
+                        <span className="text-[13px] font-bold" style={{ color: M.gold }}>{company.monthlySpend || "—"}</span>
                       </td>
 
                       <td className="px-5 py-4">
@@ -330,7 +321,7 @@ export default function CompaniesPage() {
                                 style={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
                               >
                                 <button
-                                  onClick={() => { setOpenMenuId(null); router.push(`/dashboard/companies/${company.id}`); }}
+                                  onClick={() => { setOpenMenuId(null); router.push(`/dashboard/companies/detail?id=${company.id}`); }}
                                   className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
                                   style={{ color: "#aaaaaa" }}
                                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; (e.currentTarget as HTMLElement).style.color = M.gold; }}
@@ -340,7 +331,7 @@ export default function CompaniesPage() {
                                 </button>
 
                                 <div className="my-1 h-px" style={{ background: M.border }} />
-                                {(["active", "inactive"] as const)
+                                {(["active", "suspended"] as const)
                                   .filter((s) => s !== company.status)
                                   .map((s) => {
                                     const cfg = STATUS_CFG[s];
@@ -349,7 +340,8 @@ export default function CompaniesPage() {
                                       <button
                                         key={s}
                                         onClick={() => handleSetStatus(company, s)}
-                                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                                        disabled={togglingId === company.id}
+                                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
                                         style={{ color: cfg.color }}
                                         onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
                                         onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
@@ -371,7 +363,13 @@ export default function CompaniesPage() {
           </table>
         </div>
 
-        {filtered.length === 0 && (
+        {loading && companies.length === 0 && (
+          <p className="px-4 py-16 text-center text-[12px]" style={{ color: M.textMuted }}>
+            Loading companies…
+          </p>
+        )}
+
+        {!loading && filtered.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-16">
             <div className="flex h-14 w-14 items-center justify-center rounded-xl" style={{ background: M.surface }}>
               <Building2 size={24} style={{ color: M.textMuted }} />

@@ -1,15 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layouts/sidebar";
 import { Topbar } from "@/components/layouts/topbar";
 import { PageTransition } from "@/components/ui/page-transition";
+import { isAuthenticated } from "@/lib/api/auth";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated()) { router.replace("/login"); return; }
+    setChecked(true);
+  }, [router]);
 
   const sidebarWidth = collapsed ? 64 : 264;
+
+  if (!checked) return null;
 
   return (
     <div className="min-h-screen" style={{ background: "#0a0a0a" }}>
