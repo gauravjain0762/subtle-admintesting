@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Montserrat } from "next/font/google";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Eye, Check, MoreVertical, X as XIcon } from "lucide-react";
+import { Search, Eye, Check, MoreVertical, Trash2, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   getEnquiries, approveEnquiry, rejectEnquiry,
@@ -13,6 +13,7 @@ import {
 import { LOGO_COLORS, generateCode } from "@/lib/companies-store";
 import { ApiError } from "@/lib/api/client";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
+import { BulkDeleteDialog } from "@/components/ui/bulk-delete-dialog";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -104,6 +105,10 @@ export default function CompanyRequestsPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<Enquiry | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const refresh = () => {
     setLoading(true);
@@ -150,6 +155,37 @@ export default function CompanyRequestsPage() {
     }
   };
 
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleDeleteIconClick = () => {
+    if (!selectMode) { setSelectMode(true); return; }
+    if (selectedIds.size === 0) { toast.error("Select at least one request first"); return; }
+    setBulkConfirm(true);
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      // No DELETE endpoint exists for workspace-requests yet — surface that clearly rather than pretending it worked.
+      await new Promise((r) => setTimeout(r, 300));
+      toast.error("Deleting requests isn't supported by the backend yet");
+    } finally {
+      setBulkDeleting(false);
+      setBulkConfirm(false);
+    }
+  };
+
   return (
     <div
       className={montserrat.className}
@@ -163,7 +199,18 @@ export default function CompanyRequestsPage() {
       </div>
 
       {/* Search */}
-      <div className="mb-6 flex flex-wrap gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <button
+          title={selectMode ? `Delete ${selectedIds.size} selected` : "Select requests to delete"}
+          onClick={handleDeleteIconClick}
+          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg transition-colors"
+          style={{ border: `1px solid ${M.red}`, color: M.red, background: "transparent" }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.red; (e.currentTarget as HTMLElement).style.color = "#000000"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.red; }}
+        >
+          <Trash2 size={15} />
+        </button>
+
         <div
           className="flex min-w-[220px] flex-1 items-center gap-2.5 rounded-lg px-4 py-2.5"
           style={{ border: `1px solid ${M.border}`, background: M.panel }}
@@ -183,6 +230,22 @@ export default function CompanyRequestsPage() {
             </button>
           )}
         </div>
+
+        {selectMode && (
+          <>
+            <span className="text-[11.5px] font-semibold whitespace-nowrap" style={{ color: M.textMuted }}>
+              {selectedIds.size} selected
+            </span>
+            <button
+              title="Cancel selection"
+              onClick={exitSelectMode}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors"
+              style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+            >
+              <XIcon size={14} />
+            </button>
+          </>
+        )}
       </div>
 
       {/* Table */}
@@ -191,9 +254,9 @@ export default function CompanyRequestsPage() {
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: M.surface }}>
-                {["Company", "Details", "Business Type", "Total Employees", "Address", "Status", "Actions"].map((h) => (
+                {[...(selectMode ? [""] : []), "Company", "Details", "Business Type", "Total Employees", "Address", "Status", "Actions"].map((h, i) => (
                   <th
-                    key={h}
+                    key={i}
                     className="whitespace-nowrap px-3.5 py-3 text-left text-[8.5px] font-bold uppercase tracking-[0.1em]"
                     style={{ color: M.goldMuted, borderBottom: `1px solid ${M.border}` }}
                   >
@@ -213,6 +276,16 @@ export default function CompanyRequestsPage() {
                   onMouseEnter={(ev) => ((ev.currentTarget as HTMLElement).style.background = M.surface)}
                   onMouseLeave={(ev) => ((ev.currentTarget as HTMLElement).style.background = "transparent")}
                 >
+                  {selectMode && (
+                    <td className="px-3.5 py-3.5" onClick={(ev) => ev.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(e.id)}
+                        onChange={() => toggleSelected(e.id)}
+                        className="h-4 w-4 cursor-pointer accent-[#f8e396]"
+                      />
+                    </td>
+                  )}
                   <td className="px-3.5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div
@@ -331,6 +404,18 @@ export default function CompanyRequestsPage() {
             working={workingId === rejectTarget.id}
             onClose={() => setRejectTarget(null)}
             onConfirm={(reason) => handleReject(rejectTarget, reason)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {bulkConfirm && (
+          <BulkDeleteDialog
+            count={selectedIds.size}
+            noun="requests"
+            working={bulkDeleting}
+            onConfirm={handleBulkDelete}
+            onCancel={() => setBulkConfirm(false)}
           />
         )}
       </AnimatePresence>

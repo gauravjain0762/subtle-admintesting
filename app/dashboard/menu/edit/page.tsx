@@ -4,11 +4,11 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Montserrat } from "next/font/google";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Save, Check, ChevronDown, Star, ShoppingBag, Plus, Trash2, ImagePlus, ImageOff } from "lucide-react";
+import { ArrowLeft, Save, Check, ChevronDown, Star, ShoppingBag, Plus, Trash2, ImagePlus, ImageOff, Lock } from "lucide-react";
 import { toast } from "sonner";
 import {
   getDish, updateDish, type Dish, type Ingredient, type Portion,
-  AVAILABLE_TAGS, TAG_COLORS, CATEGORIES, ALLERGENS, MEAL_DAYS, MAX_IMAGES,
+  AVAILABLE_TAGS, CATEGORIES, ALLERGENS, MEAL_DAYS, MAX_IMAGES,
 } from "@/lib/menu-store";
 import { getMenus, type Menu } from "@/lib/menus-store";
 import { SKToggle } from "@/components/ui/sk-toggle";
@@ -111,6 +111,23 @@ function EditDishContent() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form?.images]);
+
+  /** The "Regular" portion always mirrors the main Price field — auto-created once a price is entered, kept in sync, never deletable. */
+  useEffect(() => {
+    setForm((f) => {
+      if (!f) return f;
+      const idx = f.portions.findIndex((p) => p.size === "Regular");
+      if (idx === -1) {
+        if (!f.price) return f;
+        return { ...f, portions: [{ size: "Regular", price: f.price }, ...f.portions] };
+      }
+      if (f.portions[idx].price === f.price) return f;
+      const next = [...f.portions];
+      next[idx] = { ...next[idx], price: f.price };
+      return { ...f, portions: next };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form?.price]);
 
   if (loading || !form || !dish) return null;
 
@@ -265,7 +282,7 @@ function EditDishContent() {
 
       <div className="space-y-5 pb-6">
           {/* ── Basic info ── */}
-          <SectionCard label="Basic Info">
+          <SectionCard label="Basic info">
             <div className="space-y-4">
               <Field label="Dish Name" required error={errors.name}>
                 <Input
@@ -369,7 +386,7 @@ function EditDishContent() {
           </SectionCard>
 
           {/* ── Nutritional Information ── */}
-          <SectionCard label="Nutritional Information" hint="Add or remove nutrition properties freely — every property you add is saved, with or without units (e.g. 680 or 35g).">
+          <SectionCard label="Nutritional information" hint="Add or remove nutrition properties freely — every property you add is saved, with or without units (e.g. 680 or 35g).">
             <div className="space-y-2.5">
               {form.nutrition.map((n, i) => (
                 <div key={i} className="flex items-center gap-2.5">
@@ -505,43 +522,54 @@ function EditDishContent() {
           </SectionCard>
 
           {/* ── Portion Sizes ── */}
-          <SectionCard label="Portion Sizes" hint="Optional — offer this dish in multiple sizes, each with its own price.">
+          <SectionCard label="Portion sizes" hint="Optional — offer this dish in multiple sizes, each with its own price.">
             <div className="space-y-2.5">
-              {form.portions.map((p, i) => (
-                <div key={i} className="flex items-center gap-2.5">
-                  <input
-                    type="text"
-                    value={p.size}
-                    onChange={(e) => updatePortionRow(i, { size: e.target.value })}
-                    placeholder="e.g. Regular"
-                    className="flex-1 rounded-lg px-4 py-2.5 text-[13px] outline-none transition-all"
-                    style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
-                    onFocus={(e) => (e.target.style.borderColor = M.gold)}
-                    onBlur={(e)  => (e.target.style.borderColor = M.border)}
-                  />
-                  <div className="relative w-32">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: M.textMuted }}>£</span>
+              {form.portions.map((p, i) => {
+                const isRegular = p.size === "Regular";
+                return (
+                  <div key={i} className="flex items-center gap-2.5">
                     <input
-                      type="number"
-                      value={p.price}
-                      onChange={(e) => updatePortionRow(i, { price: e.target.value })}
-                      placeholder="8.50"
-                      className="w-full rounded-lg py-2.5 pl-6 pr-3 text-[13px] outline-none transition-all"
-                      style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
-                      onFocus={(e) => (e.target.style.borderColor = M.gold)}
+                      type="text"
+                      value={p.size}
+                      readOnly={isRegular}
+                      onChange={(e) => updatePortionRow(i, { size: e.target.value })}
+                      placeholder="e.g. Regular"
+                      className="flex-1 rounded-lg px-4 py-2.5 text-[13px] outline-none transition-all"
+                      style={{ border: `1px solid ${M.border}`, background: isRegular ? M.panel : M.surface, color: isRegular ? M.textMuted : M.white }}
+                      onFocus={(e) => { if (!isRegular) e.target.style.borderColor = M.gold; }}
                       onBlur={(e)  => (e.target.style.borderColor = M.border)}
                     />
+                    <div className="relative w-32">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: M.textMuted }}>£</span>
+                      <input
+                        type="number"
+                        value={p.price}
+                        readOnly={isRegular}
+                        onChange={(e) => updatePortionRow(i, { price: e.target.value })}
+                        placeholder="8.50"
+                        className="w-full rounded-lg py-2.5 pl-6 pr-3 text-[13px] outline-none transition-all"
+                        style={{ border: `1px solid ${M.border}`, background: isRegular ? M.panel : M.surface, color: isRegular ? M.textMuted : M.white }}
+                        onFocus={(e) => { if (!isRegular) e.target.style.borderColor = M.gold; }}
+                        onBlur={(e)  => (e.target.style.borderColor = M.border)}
+                      />
+                    </div>
+                    {isRegular ? (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" title="Follows the main Price field — always kept">
+                        <Lock size={12} style={{ color: M.textFaint }} />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => removePortionRow(i)}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors"
+                        style={{ border: `1px solid ${M.border}`, color: M.red }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removePortionRow(i)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors"
-                    style={{ border: `1px solid ${M.border}`, color: M.red }}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <button
               type="button"
@@ -558,7 +586,6 @@ function EditDishContent() {
             <div className="flex flex-wrap gap-2">
               {AVAILABLE_TAGS.map((tag) => {
                 const active = form.tags.includes(tag);
-                const tc     = TAG_COLORS[tag];
                 return (
                   <motion.button
                     key={tag}
@@ -567,9 +594,9 @@ function EditDishContent() {
                     onClick={() => toggleTag(tag)}
                     className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold transition-all"
                     style={{
-                      background: active ? (tc?.background ?? M.surface) : M.surface,
-                      color:      active ? (tc?.color ?? M.white)     : M.textMuted,
-                      border:     `1px solid ${active ? (tc?.background ?? M.border) : M.border}`,
+                      background: active ? "#2a2400" : M.surface,
+                      color:      active ? M.gold : M.textMuted,
+                      border:     `1px solid ${active ? M.gold : M.border}`,
                     }}
                   >
                     {active && <Check size={11} />}
@@ -655,7 +682,7 @@ function EditDishContent() {
 function SectionCard({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="rounded-xl p-5" style={{ background: M.panel, border: `1px solid ${M.border}` }}>
-      <p className="mb-1 text-[11px] font-bold uppercase tracking-wider" style={{ color: M.goldMuted }}>{label}</p>
+      <p className="mb-1 text-[11px] font-bold tracking-wider" style={{ color: M.goldMuted }}>{label}</p>
       {hint && <p className="mb-3 text-[11.5px]" style={{ color: M.textMuted }}>{hint}</p>}
       {!hint && <div className="mb-3" />}
       {children}

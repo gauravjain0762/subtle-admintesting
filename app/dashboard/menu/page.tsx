@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { getDishes, toggleDishAvailable, deleteDish, type Dish } from "@/lib/menu-store";
 import { getMenus, type Menu } from "@/lib/menus-store";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
+import { BulkDeleteDialog } from "@/components/ui/bulk-delete-dialog";
 import { ApiError } from "@/lib/api/client";
 
 const montserrat = Montserrat({
@@ -140,6 +141,10 @@ export default function MenuPage() {
   const [openMenuId,   setOpenMenuId]   = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Dish | null>(null);
   const [workingId,    setWorkingId]    = useState<string | null>(null);
+  const [selectMode,   setSelectMode]   = useState(false);
+  const [selectedIds,  setSelectedIds]  = useState<Set<string>>(new Set());
+  const [bulkConfirm,  setBulkConfirm]  = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const refresh = () => {
     setLoading(true);
@@ -192,6 +197,41 @@ export default function MenuPage() {
     } finally {
       setWorkingId(null);
       setDeleteTarget(null);
+    }
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleDeleteIconClick = () => {
+    if (!selectMode) { setSelectMode(true); return; }
+    if (selectedIds.size === 0) { toast.error("Select at least one dish first"); return; }
+    setBulkConfirm(true);
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      const ids = [...selectedIds];
+      await Promise.all(ids.map((id) => deleteDish(id)));
+      toast.error(`${ids.length} dish${ids.length > 1 ? "es" : ""} removed from menu`);
+      exitSelectMode();
+      setBulkConfirm(false);
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to delete some dishes");
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -264,8 +304,19 @@ export default function MenuPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.4 }}
-        className="flex flex-wrap gap-3"
+        className="flex flex-wrap items-center gap-3"
       >
+        <button
+          title={selectMode ? `Delete ${selectedIds.size} selected` : "Select dishes to delete"}
+          onClick={handleDeleteIconClick}
+          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg transition-colors"
+          style={{ border: `1px solid ${M.red}`, color: M.red, background: "transparent" }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.red; (e.currentTarget as HTMLElement).style.color = "#000000"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.red; }}
+        >
+          <Trash2 size={15} />
+        </button>
+
         <div
           className="flex min-w-[220px] flex-1 items-center gap-2.5 rounded-lg px-4 py-2.5"
           style={{ border: `1px solid ${M.border}`, background: M.panel }}
@@ -285,6 +336,22 @@ export default function MenuPage() {
             </button>
           )}
         </div>
+
+        {selectMode && (
+          <>
+            <span className="text-[11.5px] font-semibold whitespace-nowrap" style={{ color: M.textMuted }}>
+              {selectedIds.size} selected
+            </span>
+            <button
+              title="Cancel selection"
+              onClick={exitSelectMode}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors"
+              style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+            >
+              <X size={14} />
+            </button>
+          </>
+        )}
       </motion.div>
 
       {/* Table */}
@@ -306,8 +373,8 @@ export default function MenuPage() {
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: M.surface }}>
-                {["Dish", "Category", "Price", "Nutrition", "Menu Type", "Status", "Actions"].map((h) => (
-                  <th key={h}
+                {[...(selectMode ? [""] : []), "Dish", "Category", "Price", "Nutrition", "Menu Type", "Status", "Actions"].map((h, i) => (
+                  <th key={i}
                     className="whitespace-nowrap px-5 py-3 text-left text-[8.5px] font-bold uppercase tracking-[0.12em]"
                     style={{ color: M.goldMuted, borderBottom: `1px solid ${M.border}` }}>
                     {h}
@@ -336,6 +403,16 @@ export default function MenuPage() {
                       onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
                       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "")}
                     >
+                      {selectMode && (
+                        <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(dish.id)}
+                            onChange={() => toggleSelected(dish.id)}
+                            className="h-4 w-4 cursor-pointer accent-[#f8e396]"
+                          />
+                        </td>
+                      )}
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <motion.div
@@ -489,6 +566,19 @@ export default function MenuPage() {
             dish={deleteTarget}
             onConfirm={handleDelete}
             onCancel={() => setDeleteTarget(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Bulk delete dialog */}
+      <AnimatePresence>
+        {bulkConfirm && (
+          <BulkDeleteDialog
+            count={selectedIds.size}
+            noun="dishes"
+            working={bulkDeleting}
+            onConfirm={handleBulkDelete}
+            onCancel={() => setBulkConfirm(false)}
           />
         )}
       </AnimatePresence>
