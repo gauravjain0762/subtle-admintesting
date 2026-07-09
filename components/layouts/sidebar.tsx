@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Building2,
   UtensilsCrossed,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -39,6 +40,7 @@ const NAV: NavEntry[] = [
     ],
   },
   { label: "Meal Management", href: "/dashboard/menu", icon: UtensilsCrossed },
+  { label: "Orders", href: "/dashboard/orders", icon: ClipboardList },
 ];
 
 interface SidebarProps {

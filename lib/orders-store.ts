@@ -1,4 +1,4 @@
-import { CheckCircle2, Truck, Clock, AlertCircle } from "lucide-react";
+import { CheckCircle2, Sparkles } from "lucide-react";
 
 export interface OrderLineItem {
   dishId: number;
@@ -7,7 +7,7 @@ export interface OrderLineItem {
   unitPrice: string;
 }
 
-export type OrderStatus = "delivered" | "in-transit" | "preparing" | "cancelled";
+export type OrderStatus = "new" | "delivered";
 export type OrderType = "weekly" | "one-time" | "business";
 export type PaymentMethod = "card" | "apple_pay" | "google_pay";
 
@@ -77,31 +77,31 @@ const INITIAL_ORDERS: Order[] = [
   mkOrder({ id: "#ORD-4821", customerName: "Sarah Mitchell", companyId: "acme", companyCode: "ACME-2401", companyName: "Acme Corp.",
     items: [line(1, "Chicken Katsu Curry", "13.25")], status: "delivered", type: "weekly", paymentMethod: "card", daysAgo: 0 }),
   mkOrder({ id: "#ORD-4820", customerName: "James Thompson",
-    items: [line(2, "Mediterranean Salmon", "13.25")], status: "in-transit", type: "one-time", paymentMethod: "apple_pay", daysAgo: 0 }),
+    items: [line(2, "Mediterranean Salmon", "13.25")], status: "new", type: "one-time", paymentMethod: "apple_pay", daysAgo: 0 }),
   mkOrder({ id: "#ORD-4819", customerName: "Priya Kapoor", companyId: "techlondon", companyCode: "TECH-2412", companyName: "TechLondon Ltd",
-    items: [line(3, "Chicken Teriyaki", "8.50", 2)], status: "preparing", type: "weekly", paymentMethod: "google_pay", daysAgo: 0 }),
+    items: [line(3, "Chicken Teriyaki", "8.50", 2)], status: "new", type: "weekly", paymentMethod: "google_pay", daysAgo: 0 }),
   mkOrder({ id: "#ORD-4818", customerName: "Acme Corp.", companyId: "acme", companyCode: "ACME-2401", companyName: "Acme Corp.",
     items: [line(1, "Chicken Katsu Curry", "8.50", 8)], status: "delivered", type: "business", paymentMethod: "card", daysAgo: 0 }),
   mkOrder({ id: "#ORD-4817", customerName: "Luke Roberts",
-    items: [line(4, "Tuscan Bean Soup", "7.00")], status: "cancelled", type: "one-time", paymentMethod: "card", daysAgo: 0 }),
+    items: [line(4, "Tuscan Bean Soup", "7.00")], status: "new", type: "one-time", paymentMethod: "card", daysAgo: 0 }),
   mkOrder({ id: "#ORD-4816", customerName: "Emma Clarke", companyId: "financehub", companyCode: "FHUB-2411", companyName: "FinanceHub UK",
     items: [line(5, "Margherita Focaccia Pizza", "8.50")], status: "delivered", type: "weekly", paymentMethod: "apple_pay", daysAgo: 0 }),
   mkOrder({ id: "#ORD-4815", customerName: "Daniel Park", companyId: "creativestudio", companyCode: "CRST-2501", companyName: "Creative Studio",
     items: [line(1, "Chicken Katsu Curry", "13.25")], status: "delivered", type: "weekly", paymentMethod: "card", daysAgo: 1 }),
   mkOrder({ id: "#ORD-4814", customerName: "TechLondon Ltd", companyId: "techlondon", companyCode: "TECH-2412", companyName: "TechLondon Ltd",
-    items: [line(3, "Chicken Teriyaki", "8.50", 12)], status: "in-transit", type: "business", paymentMethod: "card", daysAgo: 1 }),
+    items: [line(3, "Chicken Teriyaki", "8.50", 12)], status: "new", type: "business", paymentMethod: "card", daysAgo: 1 }),
   mkOrder({ id: "#ORD-4813", customerName: "Olivia Brown",
     items: [line(2, "Mediterranean Salmon", "13.25")], status: "delivered", type: "one-time", paymentMethod: "google_pay", daysAgo: 1 }),
   mkOrder({ id: "#ORD-4812", customerName: "Marcus Wilson",
     items: [line(4, "Tuscan Bean Soup", "7.00")], status: "delivered", type: "weekly", paymentMethod: "card", daysAgo: 1 }),
   mkOrder({ id: "#ORD-4811", customerName: "Sophie Adams",
-    items: [line(3, "Chicken Teriyaki", "8.50")], status: "preparing", type: "weekly", paymentMethod: "apple_pay", daysAgo: 2 }),
+    items: [line(3, "Chicken Teriyaki", "8.50")], status: "new", type: "weekly", paymentMethod: "apple_pay", daysAgo: 2 }),
   mkOrder({ id: "#ORD-4810", customerName: "Creative Studio", companyId: "creativestudio", companyCode: "CRST-2501", companyName: "Creative Studio",
     items: [line(5, "Margherita Focaccia Pizza", "8.50", 20)], status: "delivered", type: "business", paymentMethod: "card", daysAgo: 2 }),
   mkOrder({ id: "#ORD-4809", customerName: "Raj Patel", companyId: "patelconsulting", companyCode: "PCON-2412", companyName: "Patel Consulting",
-    items: [line(8, "Lemon Herb Chicken", "11.50", 3)], status: "preparing", type: "weekly", paymentMethod: "card", daysAgo: 0 }),
+    items: [line(8, "Lemon Herb Chicken", "11.50", 3)], status: "new", type: "weekly", paymentMethod: "card", daysAgo: 0 }),
   mkOrder({ id: "#ORD-4808", customerName: "Dr. James Ford", companyId: "greenleaf", companyCode: "GLHC-2502", companyName: "Greenleaf Health",
-    items: [line(7, "Caesar Salad Bowl", "9.00", 2), line(4, "Tuscan Bean Soup", "7.00")], status: "preparing", type: "business", paymentMethod: "card", daysAgo: 0 }),
+    items: [line(7, "Caesar Salad Bowl", "9.00", 2), line(4, "Tuscan Bean Soup", "7.00")], status: "new", type: "business", paymentMethod: "card", daysAgo: 0 }),
 ];
 
 const KEY = "sk_admin_orders";
@@ -178,10 +178,8 @@ export function deleteOrder(id: string): void {
 }
 
 export const STATUS_CFG: Record<OrderStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  delivered:    { label: "Delivered",  color: "#2d6a2d", bg: "#edf7ed", icon: CheckCircle2 },
-  "in-transit": { label: "In Transit", color: "#0a3d8f", bg: "#e8f0fe", icon: Truck },
-  preparing:    { label: "Preparing",  color: "#7a5a00", bg: "#fffce0", icon: Clock },
-  cancelled:    { label: "Cancelled",  color: "#b83232", bg: "#fef2f2", icon: AlertCircle },
+  new:       { label: "New",       color: "#7a5a00", bg: "#fffce0", icon: Sparkles },
+  delivered: { label: "Delivered", color: "#2d6a2d", bg: "#edf7ed", icon: CheckCircle2 },
 };
 
 export const TYPE_CFG: Record<OrderType, { color: string; bg: string }> = {

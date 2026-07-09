@@ -1,25 +1,104 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Download, ChevronLeft, ChevronRight, Eye, X } from "lucide-react";
+import { Montserrat } from "next/font/google";
+import { Search, Download, ChevronLeft, ChevronRight, Eye, X, ClipboardList, CheckCircle2, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { getOrders, STATUS_CFG, TYPE_CFG, type Order, type OrderStatus, type OrderType } from "@/lib/orders-store";
+import { getOrders, STATUS_CFG, type Order, type OrderStatus, type OrderType } from "@/lib/orders-store";
+import { getCompanies } from "@/lib/companies-store";
 
-const STATUS_FILTERS = ["All", "Delivered", "In Transit", "Preparing", "Cancelled"];
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+/* ── Mentor project reference palette (matches companies/page.tsx) ── */
+const M = {
+  panel: "#0d0d0d",
+  surface: "#111111",
+  border: "#1e1e1e",
+  borderFaint: "#131313",
+  gold: "#f8e396",
+  goldMuted: "rgba(248,227,150,0.6)",
+  goldFaint: "rgba(248,227,150,0.28)",
+  white: "#ffffff",
+  textMuted: "#888888",
+  textFaint: "#444444",
+  green: "#22c55e",
+  amber: "#f5c451",
+  red: "#ff6b6b",
+};
+
+const STATUS_FILTERS = ["All", "New", "Delivered"];
 const TYPE_FILTERS   = ["All Types", "Weekly", "One-Time", "Business"];
+const ALL_COMPANIES  = "All Companies";
+const INDIVIDUAL     = "Individual (No Company)";
+
+const STATUS_COLOR: Record<OrderStatus, string> = {
+  new: M.amber,
+  delivered: M.green,
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 24, scale: 0.97 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
+};
+const rowVariants = {
+  hidden: { opacity: 0, x: -12 },
+  show: (i: number) => ({
+    opacity: 1, x: 0,
+    transition: { delay: i * 0.03, duration: 0.32, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
+  }),
+};
+
+function StatCard({ label, value, icon: Icon, accent }: {
+  label: string; value: string | number;
+  icon: React.ElementType; accent: string;
+}) {
+  return (
+    <motion.div
+      variants={cardVariants}
+      whileHover={{ y: -2 }}
+      className="rounded-lg p-5"
+      style={{ background: M.panel, border: `1px solid ${M.border}`, borderLeft: `3px solid ${accent}` }}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: M.textFaint }}>{label}</p>
+          <p className="mt-3 text-[28px] font-bold leading-none" style={{ color: M.white }}>{value}</p>
+        </div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: M.surface }}>
+          <Icon size={16} style={{ color: accent }} strokeWidth={1.8} />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 function StatusBadge({ status }: { status: OrderStatus }) {
   const cfg = STATUS_CFG[status];
   if (!cfg) return null;
   const SIcon = cfg.icon;
+  const color = STATUS_COLOR[status];
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-      style={{ background: cfg.bg, color: cfg.color }}
+      className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10.5px] font-bold"
+      style={{ border: `1px solid ${color}`, color }}
     >
       <SIcon size={10} />
       {cfg.label}
+    </span>
+  );
+}
+
+function TypeBadge({ type }: { type: OrderType }) {
+  return (
+    <span
+      className="rounded-md px-2.5 py-1 text-[10.5px] font-semibold capitalize"
+      style={{ background: M.surface, color: M.goldMuted, border: `1px solid ${M.border}` }}
+    >
+      {type}
     </span>
   );
 }
@@ -38,10 +117,15 @@ export default function OrdersPage() {
   const [search, setSearch]           = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter]     = useState("All Types");
+  const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES);
+  const [companies, setCompanies]     = useState(() => getCompanies());
 
   useEffect(() => {
     setOrders(getOrders());
+    setCompanies(getCompanies());
   }, []);
+
+  const companyOptions = [ALL_COMPANIES, INDIVIDUAL, ...companies.map((c) => c.name)];
 
   const todayISO = new Date().toISOString().slice(0, 10);
   const todaysOrders = orders.filter((o) => o.dateISO === todayISO);
@@ -59,139 +143,142 @@ export default function OrdersPage() {
     const matchType =
       typeFilter === "All Types" ||
       o.type === (typeFilter.toLowerCase().replace(" ", "-") as OrderType);
-    return matchSearch && matchStatus && matchType;
+    const matchCompany =
+      companyFilter === ALL_COMPANIES ||
+      (companyFilter === INDIVIDUAL && !o.companyId) ||
+      o.companyName === companyFilter;
+    return matchSearch && matchStatus && matchType && matchCompany;
   });
 
   const stats = [
-    { label: "Today's Orders", value: todaysOrders.length, color: "#0a0a0a", bg: "#f0e9d6" },
-    { label: "Delivered",      value: todaysOrders.filter((o) => o.status === "delivered").length,   color: "#2d6a2d", bg: "#edf7ed" },
-    { label: "In Transit",     value: todaysOrders.filter((o) => o.status === "in-transit").length,  color: "#0a3d8f", bg: "#e8f0fe" },
-    { label: "Preparing",      value: todaysOrders.filter((o) => o.status === "preparing").length,   color: "#7a5a00", bg: "#fffce0" },
+    { label: "Today's Orders", value: todaysOrders.length, icon: ClipboardList, accent: M.gold },
+    { label: "New",            value: todaysOrders.filter((o) => o.status === "new").length,       icon: Sparkles,     accent: M.amber },
+    { label: "Delivered",      value: todaysOrders.filter((o) => o.status === "delivered").length,  icon: CheckCircle2, accent: M.green },
   ];
-  const maxStat = Math.max(1, ...stats.map((s) => s.value));
 
   return (
-    <div className="space-y-5">
+    <div className={`space-y-6 ${montserrat.className}`}>
       {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: -14 }}
+        initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="flex flex-wrap items-center justify-between gap-4"
       >
         <div>
-          <h1 className="text-[22px] font-bold" style={{ color: "#0a0a0a" }}>Orders</h1>
-          <p className="text-[13px]" style={{ color: "#6b6b5a" }}>{orders.length} total orders</p>
+          <h1 className="text-[26px] font-bold tracking-tight" style={{ color: M.gold }}>Orders</h1>
+          <p className="mt-0.5 text-[12px]" style={{ color: "#D0C5AF" }}>{orders.length} total orders across all companies and customers</p>
         </div>
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => toast.success("Exporting orders as CSV…")}
-          className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12px] font-semibold"
-          style={{ background: "#0a0a0a", color: "#ffffff" }}
+          className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-[12px] font-semibold"
+          style={{ background: M.gold, color: "#000000" }}
         >
           <Download size={13} /> Export CSV
         </motion.button>
       </motion.div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {stats.map((s, i) => (
-          <motion.div
-            key={s.label}
-            initial={{ opacity: 0, y: 18, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: i * 0.06, duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-            whileHover={{ y: -3, boxShadow: "0 10px 28px rgba(0,0,0,0.08)" }}
-            className="rounded-2xl p-4"
-            style={{ background: "#fff", border: "1.5px solid #e8e0cc" }}
-          >
-            <p className="text-[10.5px] font-semibold uppercase tracking-wider" style={{ color: "#9b9b89" }}>
-              {s.label}
-            </p>
-            <p className="mt-1.5 text-[28px] font-bold leading-none" style={{ color: s.color }}>
-              {s.value}
-            </p>
-            <div className="mt-2 h-1 w-full overflow-hidden rounded-full" style={{ background: "#f0e9d6" }}>
-              <div className="h-full rounded-full" style={{ width: `${(s.value / maxStat) * 100}%`, background: s.color }} />
-            </div>
-          </motion.div>
+      <motion.div
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.07 } } }}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+      >
+        {stats.map((s) => (
+          <StatCard key={s.label} label={s.label} value={s.value} icon={s.icon} accent={s.accent} />
         ))}
-      </div>
+      </motion.div>
 
       {/* Filters */}
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12, duration: 0.34 }}
-        className="rounded-2xl p-4"
-        style={{ background: "#ffffff", border: "1.5px solid #e8e0cc" }}
+        transition={{ delay: 0.15, duration: 0.4 }}
+        className="flex flex-wrap gap-3"
       >
-        <div className="flex flex-wrap gap-3">
-          <div
-            className="flex min-w-[200px] flex-1 items-center gap-2.5 rounded-xl px-3.5 py-2.5"
-            style={{ border: "1.5px solid #e8e0cc", background: "#fdf8ec" }}
-          >
-            <Search size={13} style={{ color: "#9b9b89" }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search orders, customers, codes…"
-              className="flex-1 bg-transparent text-[13px] outline-none"
-              style={{ color: "#0a0a0a" }}
-            />
-            {search && (
-              <button onClick={() => setSearch("")} style={{ color: "#9b9b89" }}>
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => setStatusFilter(f)}
-                className="rounded-lg px-3 py-2 text-[11.5px] font-semibold transition-all"
-                style={{
-                  background: statusFilter === f ? "#0a0a0a" : "#f0e9d6",
-                  color: statusFilter === f ? "#ffffff" : "#6b6b5a",
-                }}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="rounded-xl px-3.5 py-2 text-[12px] font-medium outline-none"
-            style={{ border: "1.5px solid #e8e0cc", background: "#fdf8ec", color: "#0a0a0a" }}
-          >
-            {TYPE_FILTERS.map((t) => <option key={t}>{t}</option>)}
-          </select>
+        <div
+          className="flex min-w-[220px] flex-1 items-center gap-2.5 rounded-lg px-4 py-2.5"
+          style={{ border: `1px solid ${M.border}`, background: M.panel }}
+        >
+          <Search size={14} style={{ color: M.textFaint }} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search orders, customers, codes…"
+            className="flex-1 bg-transparent text-[13px] outline-none"
+            style={{ color: M.white }}
+          />
+          {search && (
+            <button onClick={() => setSearch("")} style={{ color: M.textMuted }}>
+              <X size={13} />
+            </button>
+          )}
         </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f}
+              onClick={() => setStatusFilter(f)}
+              className="rounded-lg px-3 py-2 text-[11.5px] font-semibold transition-all"
+              style={{
+                background: statusFilter === f ? M.gold : M.panel,
+                color: statusFilter === f ? "#000000" : M.textMuted,
+                border: `1px solid ${statusFilter === f ? M.gold : M.border}`,
+              }}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="rounded-lg px-3.5 py-2 text-[12px] font-medium outline-none"
+          style={{ border: `1px solid ${M.border}`, background: M.panel, color: M.white }}
+        >
+          {TYPE_FILTERS.map((t) => <option key={t}>{t}</option>)}
+        </select>
+
+        <select
+          value={companyFilter}
+          onChange={(e) => setCompanyFilter(e.target.value)}
+          className="rounded-lg px-3.5 py-2 text-[12px] font-medium outline-none"
+          style={{ border: `1px solid ${M.border}`, background: M.panel, color: M.white }}
+        >
+          {companyOptions.map((c) => <option key={c}>{c}</option>)}
+        </select>
       </motion.div>
 
       {/* Table */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.18, duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-        className="overflow-hidden rounded-2xl"
-        style={{ background: "#ffffff", border: "1.5px solid #e8e0cc" }}
+        transition={{ delay: 0.2, duration: 0.45 }}
+        className="overflow-hidden rounded-xl"
+        style={{ background: M.panel, border: `1px solid ${M.border}` }}
       >
+        <div className="px-6 py-4" style={{ borderBottom: `1px solid ${M.border}` }}>
+          <p className="text-[13px] font-bold" style={{ color: M.white }}>Order List</p>
+          <p className="text-[11.5px]" style={{ color: M.textMuted }}>
+            {filtered.length} {filtered.length === 1 ? "order" : "orders"} found
+          </p>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full border-collapse">
             <thead>
-              <tr style={{ borderBottom: "1.5px solid #f0e9d6" }}>
-                {["Order ID", "Customer", "Dish(es)", "Type", "Amount", "Status", "Date", ""].map((h) => (
+              <tr style={{ background: M.surface }}>
+                {["Order ID", "Customer", "Company", "Dish(es)", "Type", "Amount", "Status", "Date", ""].map((h) => (
                   <th
                     key={h}
-                    className="px-5 py-3.5 text-left text-[10.5px] font-semibold uppercase tracking-wider"
-                    style={{ color: "#9b9b89" }}
+                    className="whitespace-nowrap px-5 py-3 text-left text-[8.5px] font-bold uppercase tracking-[0.12em]"
+                    style={{ color: M.goldMuted, borderBottom: `1px solid ${M.border}` }}
                   >
                     {h}
                   </th>
@@ -200,65 +287,67 @@ export default function OrdersPage() {
             </thead>
             <tbody>
               {filtered.map((order, i) => {
-                const tc = TYPE_CFG[order.type] ?? TYPE_CFG["one-time"];
                 const label = order.companyCode
                   ? `${order.customerInitials} | ${order.companyCode}`
                   : order.customerInitials;
                 return (
                   <motion.tr
                     key={order.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    custom={i}
+                    variants={rowVariants}
+                    initial="hidden"
+                    animate="show"
                     className="cursor-pointer transition-colors"
-                    style={{ borderBottom: i < filtered.length - 1 ? "1px solid #f0e9d6" : "none" }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#fdf8ec"; }}
+                    style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${M.borderFaint}` : "none" }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
                   >
-                    <td className="px-5 py-3.5">
-                      <span className="text-[12px] font-bold" style={{ color: "#0a0a0a" }}>{order.id}</span>
+                    <td className="px-5 py-4">
+                      <span className="text-[12px] font-bold" style={{ color: M.gold }}>{order.id}</span>
                     </td>
-                    <td className="px-5 py-3.5">
-                      <span className="text-[12.5px] font-medium" style={{ color: "#0a0a0a" }}>{order.customerName}</span>
-                      <div className="mt-0.5">
+                    <td className="px-5 py-4">
+                      <span className="text-[12.5px] font-semibold" style={{ color: M.white }}>{order.customerName}</span>
+                      <div className="mt-1">
                         <span
                           className="rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wider"
-                          style={{ background: "#f0e9d6", color: "#6b6b5a" }}
+                          style={{ background: M.surface, color: M.textMuted, border: `1px solid ${M.border}` }}
                         >
                           {label}
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 max-w-[220px]">
-                      <span className="text-[12.5px] line-clamp-1" style={{ color: "#6b6b5a" }}>{itemsLabel(order)}</span>
+                    <td className="px-5 py-4">
+                      {order.companyName ? (
+                        <span className="text-[12.5px] font-medium" style={{ color: "#cccccc" }}>{order.companyName}</span>
+                      ) : (
+                        <span className="text-[12px] italic" style={{ color: M.textFaint }}>Individual</span>
+                      )}
                     </td>
-                    <td className="px-5 py-3.5">
-                      <span
-                        className="rounded-full px-2.5 py-1 text-[10.5px] font-semibold capitalize"
-                        style={{ background: tc.bg, color: tc.color }}
-                      >
-                        {order.type}
-                      </span>
+                    <td className="px-5 py-4 max-w-[220px]">
+                      <span className="text-[12.5px] line-clamp-1" style={{ color: M.textMuted }}>{itemsLabel(order)}</span>
                     </td>
-                    <td className="px-5 py-3.5">
-                      <span className="text-[12.5px] font-bold" style={{ color: "#0a0a0a" }}>{order.totalAmount}</span>
+                    <td className="px-5 py-4">
+                      <TypeBadge type={order.type} />
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-4">
+                      <span className="text-[13px] font-bold" style={{ color: M.gold }}>{order.totalAmount}</span>
+                    </td>
+                    <td className="px-5 py-4">
                       <StatusBadge status={order.status} />
                     </td>
-                    <td className="px-5 py-3.5">
-                      <span className="text-[12px]" style={{ color: "#9b9b89" }}>{order.dateDisplay}</span>
+                    <td className="px-5 py-4">
+                      <span className="text-[12px]" style={{ color: M.textMuted }}>{order.dateDisplay}</span>
                     </td>
-                    <td className="px-5 py-3.5">
-                      <motion.button
-                        whileHover={{ scale: 1.15, background: "#f0e9d6" }}
-                        whileTap={{ scale: 0.9 }}
+                    <td className="px-5 py-4">
+                      <button
                         onClick={() => toast.success(`Order ${order.id} — ${order.customerName}`)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors"
-                        style={{ color: "#9b9b89" }}
+                        className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                        style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = M.textMuted; (e.currentTarget as HTMLElement).style.borderColor = M.border; }}
                       >
                         <Eye size={13} />
-                      </motion.button>
+                      </button>
                     </td>
                   </motion.tr>
                 );
@@ -267,16 +356,26 @@ export default function OrdersPage() {
           </table>
         </div>
 
+        {filtered.length === 0 && (
+          <div className="flex flex-col items-center gap-3 py-16">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl" style={{ background: M.surface }}>
+              <ClipboardList size={24} style={{ color: M.textMuted }} />
+            </div>
+            <p className="text-[13px] font-semibold" style={{ color: M.white }}>No orders found</p>
+            <p className="text-[12px]" style={{ color: M.textMuted }}>Try a different search or filter</p>
+          </div>
+        )}
+
         {/* Pagination */}
         <div
           className="flex items-center justify-between px-5 py-3.5"
-          style={{ borderTop: "1px solid #f0e9d6" }}
+          style={{ borderTop: `1px solid ${M.border}` }}
         >
-          <span className="text-[12px]" style={{ color: "#9b9b89" }}>
+          <span className="text-[12px]" style={{ color: M.textMuted }}>
             Showing {filtered.length} of {orders.length} orders
           </span>
           <div className="flex items-center gap-1">
-            <button className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[#f0e9d6]" style={{ color: "#9b9b89" }}>
+            <button className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors" style={{ color: M.textMuted }}>
               <ChevronLeft size={14} />
             </button>
             {[1, 2, 3].map((p) => (
@@ -284,14 +383,14 @@ export default function OrdersPage() {
                 key={p}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-medium transition-colors"
                 style={{
-                  background: p === 1 ? "#0a0a0a" : "transparent",
-                  color: p === 1 ? "#ffffff" : "#6b6b5a",
+                  background: p === 1 ? M.gold : "transparent",
+                  color: p === 1 ? "#000000" : M.textMuted,
                 }}
               >
                 {p}
               </button>
             ))}
-            <button className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[#f0e9d6]" style={{ color: "#9b9b89" }}>
+            <button className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors" style={{ color: M.textMuted }}>
               <ChevronRight size={14} />
             </button>
           </div>
