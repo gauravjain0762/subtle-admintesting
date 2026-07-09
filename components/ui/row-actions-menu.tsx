@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -16,11 +16,15 @@ interface RowActionsMenuProps {
  * Kebab-menu trigger + dropdown, portaled to document.body and positioned
  * with fixed coordinates so it's never clipped by a scrollable/rounded-corner
  * ancestor (e.g. a table's `overflow-x-auto` wrapper) — no matter which row it's on.
+ *
+ * Flips to open upward instead of downward when there isn't enough viewport
+ * space below the trigger, so it never overlaps the row/content beneath it.
  */
 export function RowActionsMenu({ open, onOpenChange, trigger, children, menuStyle }: RowActionsMenuProps) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
+  const [anchorRect, setAnchorRect] = useState<{ top: number; bottom: number; right: number } | null>(null);
+  const [placement, setPlacement] = useState<"below" | "above">("below");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -30,7 +34,7 @@ export function RowActionsMenu({ open, onOpenChange, trigger, children, menuStyl
     const update = () => {
       const r = anchorRef.current?.getBoundingClientRect();
       if (!r) return;
-      setCoords({ top: r.bottom + 6, right: window.innerWidth - r.right });
+      setAnchorRect({ top: r.top, bottom: r.bottom, right: r.right });
     };
     update();
     window.addEventListener("scroll", update, true);
@@ -40,6 +44,15 @@ export function RowActionsMenu({ open, onOpenChange, trigger, children, menuStyl
       window.removeEventListener("resize", update);
     };
   }, [open]);
+
+  /** Measure the rendered menu and flip above the trigger if it wouldn't fit below — runs before paint so there's no visible jump. */
+  useLayoutEffect(() => {
+    if (!open || !anchorRect || !menuRef.current) return;
+    const menuHeight = menuRef.current.offsetHeight;
+    const spaceBelow = window.innerHeight - anchorRect.bottom;
+    const spaceAbove = anchorRect.top;
+    setPlacement(spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow ? "above" : "below");
+  }, [open, anchorRect, children]);
 
   useEffect(() => {
     if (!open) return;
@@ -57,15 +70,21 @@ export function RowActionsMenu({ open, onOpenChange, trigger, children, menuStyl
       {trigger}
       {mounted && createPortal(
         <AnimatePresence>
-          {open && coords && (
+          {open && anchorRect && (
             <motion.div
               ref={menuRef}
-              initial={{ opacity: 0, y: -6, scale: 0.96 }}
+              initial={{ opacity: 0, y: placement === "below" ? -6 : 6, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.97 }}
+              exit={{ opacity: 0, y: placement === "below" ? -4 : 4, scale: 0.97 }}
               transition={{ duration: 0.14 }}
               className="fixed z-[200] min-w-[170px] rounded-lg p-1.5"
-              style={{ top: coords.top, right: coords.right, ...menuStyle }}
+              style={{
+                right: window.innerWidth - anchorRect.right,
+                ...(placement === "below"
+                  ? { top: anchorRect.bottom + 6 }
+                  : { bottom: window.innerHeight - anchorRect.top + 6 }),
+                ...menuStyle,
+              }}
               onClick={(e) => e.stopPropagation()}
             >
               {children}

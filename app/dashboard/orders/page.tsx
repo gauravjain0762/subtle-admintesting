@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Montserrat } from "next/font/google";
-import { Search, Download, ChevronLeft, ChevronRight, Eye, X, ClipboardList, CheckCircle2, Sparkles } from "lucide-react";
+import { Search, Download, ChevronLeft, ChevronRight, ChevronDown, Eye, X, ClipboardList, CheckCircle2, Sparkles, Ban } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { getOrders, STATUS_CFG, type Order, type OrderStatus, type OrderType } from "@/lib/orders-store";
+import {
+  getOrders, getAllOrders, bulkUpdateStatus, STATUS_CFG,
+  type Order, type OrderStatus, type OrderType,
+} from "@/lib/orders-store";
 import { getCompanies, type Company } from "@/lib/companies-store";
 import { ApiError } from "@/lib/api/client";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -31,14 +36,24 @@ const M = {
   red: "#ff6b6b",
 };
 
-const STATUS_FILTERS = ["All", "New", "Delivered"];
-const TYPE_FILTERS   = ["All Types", "Weekly", "One-Time", "Business"];
+const STATUS_FILTERS = ["All", "New", "Delivered", "Cancelled"];
+const TYPE_FILTERS   = ["All Types", "Weekly", "One-off"];
+const DAY_FILTERS    = ["All Time", "Today", "Yesterday", "Last 7 Days", "Custom Date"];
 const ALL_COMPANIES  = "All Companies";
-const INDIVIDUAL     = "Individual (No Company)";
+const PAGE_SIZE      = 10;
+
+const DAY_FILTER_PARAM: Record<string, "today" | "yesterday" | "last7days" | "custom" | undefined> = {
+  "All Time": undefined,
+  "Today": "today",
+  "Yesterday": "yesterday",
+  "Last 7 Days": "last7days",
+  "Custom Date": "custom",
+};
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
   new: M.amber,
   delivered: M.green,
+  cancelled: M.red,
 };
 
 const cardVariants = {
@@ -104,6 +119,42 @@ function TypeBadge({ type }: { type: OrderType }) {
   );
 }
 
+function FilterSelect({ value, options, onChange, minWidth }: {
+  value: string; options: string[]; onChange: (v: string) => void; minWidth?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <RowActionsMenu
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex flex-none items-center justify-between gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-[12px] font-medium transition-colors"
+          style={{ border: `1px solid ${open ? M.gold : M.border}`, background: M.panel, color: M.white, minWidth }}
+        >
+          {value}
+          <ChevronDown size={13} style={{ color: M.textFaint, flexShrink: 0 }} />
+        </button>
+      }
+      menuStyle={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", minWidth: minWidth ?? 160 }}
+    >
+      {options.map((opt) => (
+        <button
+          key={opt}
+          onClick={() => { onChange(opt); setOpen(false); }}
+          className="flex w-full items-center whitespace-nowrap rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+          style={{ color: opt === value ? M.gold : "#aaaaaa", background: "transparent" }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+        >
+          {opt}
+        </button>
+      ))}
+    </RowActionsMenu>
+  );
+}
+
 function itemsLabel(order: Order): string {
   if (order.items.length === 0) return "—";
   if (order.items.length === 1) {
@@ -114,50 +165,108 @@ function itemsLabel(order: Order): string {
 }
 
 export default function OrdersPage() {
+  const router = useRouter();
   const [orders, setOrders]           = useState<Order[]>([]);
+  const [total, setTotal]             = useState(0);
+  const [totalPages, setTotalPages]   = useState(1);
+  const [loading, setLoading]         = useState(true);
   const [search, setSearch]           = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter]     = useState("All Types");
   const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES);
+  const [dayFilter, setDayFilter]     = useState("All Time");
+  const [customDate, setCustomDate]   = useState("");
   const [companies, setCompanies]     = useState<Company[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectMode, setSelectMode]   = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [todayStats, setTodayStats]   = useState({ total: 0, new: 0, delivered: 0 });
+  const [refreshKey, setRefreshKey]   = useState(0);
 
   useEffect(() => {
-    setOrders(getOrders());
     getCompanies()
       .then(setCompanies)
       .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to load companies"));
   }, []);
 
-  const companyOptions = [ALL_COMPANIES, INDIVIDUAL, ...companies.map((c) => c.name)];
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const todayISO = new Date().toISOString().slice(0, 10);
-  const todaysOrders = orders.filter((o) => o.dateISO === todayISO);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter, typeFilter, companyFilter, dayFilter, customDate]);
 
-  const filtered = orders.filter((o) => {
-    const q = search.toLowerCase();
-    const matchSearch = !search ||
-      o.customerName.toLowerCase().includes(q) ||
-      o.id.toLowerCase().includes(q) ||
-      (o.companyCode ?? "").toLowerCase().includes(q) ||
-      o.items.some((it) => it.dishName.toLowerCase().includes(q));
-    const matchStatus =
-      statusFilter === "All" ||
-      STATUS_CFG[o.status]?.label === statusFilter;
-    const matchType =
-      typeFilter === "All Types" ||
-      o.type === (typeFilter.toLowerCase().replace(" ", "-") as OrderType);
-    const matchCompany =
-      companyFilter === ALL_COMPANIES ||
-      (companyFilter === INDIVIDUAL && !o.companyId) ||
-      o.companyName === companyFilter;
-    return matchSearch && matchStatus && matchType && matchCompany;
-  });
+  const refreshTodayStats = () => {
+    getAllOrders({ dayFilter: "today" })
+      .then((list) => setTodayStats({
+        total: list.length,
+        new: list.filter((o) => o.status === "new").length,
+        delivered: list.filter((o) => o.status === "delivered").length,
+      }))
+      .catch(() => {});
+  };
+
+  useEffect(() => { refreshTodayStats(); }, [refreshKey]);
+
+  useEffect(() => {
+    setLoading(true);
+    const companyId = companyFilter === ALL_COMPANIES ? undefined : companies.find((c) => c.name === companyFilter)?.id;
+    getOrders({
+      page: currentPage,
+      limit: PAGE_SIZE,
+      status: statusFilter === "All" ? undefined : (statusFilter.toLowerCase() as OrderStatus),
+      type: typeFilter === "All Types" ? undefined : (typeFilter.toLowerCase() as OrderType),
+      workspaceId: companyId,
+      dayFilter: DAY_FILTER_PARAM[dayFilter],
+      startDate: dayFilter === "Custom Date" ? customDate : undefined,
+      endDate: dayFilter === "Custom Date" ? customDate : undefined,
+      search: debouncedSearch || undefined,
+    })
+      .then((res) => { setOrders(res.orders); setTotal(res.total); setTotalPages(res.totalPages); })
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to load orders"))
+      .finally(() => setLoading(false));
+  }, [currentPage, statusFilter, typeFilter, companyFilter, dayFilter, customDate, debouncedSearch, companies, refreshKey]);
+
+  const companyOptions = [ALL_COMPANIES, ...companies.map((c) => c.name)];
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleMarkClick = (status: "delivered" | "cancelled") => {
+    if (!selectMode) { setSelectMode(true); return; }
+    if (selectedIds.size === 0) { toast.error("Select at least one order first"); return; }
+    const ids = [...selectedIds];
+    bulkUpdateStatus(ids, status)
+      .then((updatedCount) => {
+        setSelectedIds(new Set());
+        setSelectMode(false);
+        setRefreshKey((k) => k + 1);
+        toast.success(`${updatedCount} order${updatedCount > 1 ? "s" : ""} marked as ${STATUS_CFG[status].label}`);
+      })
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to update orders"));
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
 
   const stats = [
-    { label: "Today's Orders", value: todaysOrders.length, icon: ClipboardList, accent: M.gold },
-    { label: "New",            value: todaysOrders.filter((o) => o.status === "new").length,       icon: Sparkles,     accent: M.amber },
-    { label: "Delivered",      value: todaysOrders.filter((o) => o.status === "delivered").length,  icon: CheckCircle2, accent: M.green },
+    { label: "Today's Orders", value: todayStats.total,     icon: ClipboardList, accent: M.gold },
+    { label: "New",            value: todayStats.new,       icon: Sparkles,     accent: M.amber },
+    { label: "Delivered",      value: todayStats.delivered, icon: CheckCircle2, accent: M.green },
   ];
+
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, total);
 
   return (
     <div className={`space-y-6 ${montserrat.className}`}>
@@ -170,7 +279,7 @@ export default function OrdersPage() {
       >
         <div>
           <h1 className="text-[26px] font-bold tracking-tight" style={{ color: M.gold }}>Orders</h1>
-          <p className="mt-0.5 text-[12px]" style={{ color: "#D0C5AF" }}>{orders.length} total orders across all companies and customers</p>
+          <p className="mt-0.5 text-[12px]" style={{ color: "#D0C5AF" }}>{total} total orders across all companies and customers</p>
         </div>
         <motion.button
           whileHover={{ scale: 1.03 }}
@@ -200,34 +309,14 @@ export default function OrdersPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.4 }}
-        className="flex flex-wrap gap-3"
+        className="flex flex-nowrap items-center gap-3 overflow-x-auto pb-1"
       >
-        <div
-          className="flex min-w-[220px] flex-1 items-center gap-2.5 rounded-lg px-4 py-2.5"
-          style={{ border: `1px solid ${M.border}`, background: M.panel }}
-        >
-          <Search size={14} style={{ color: M.textFaint }} />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search orders, customers, codes…"
-            className="flex-1 bg-transparent text-[13px] outline-none"
-            style={{ color: M.white }}
-          />
-          {search && (
-            <button onClick={() => setSearch("")} style={{ color: M.textMuted }}>
-              <X size={13} />
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-none flex-wrap gap-1.5">
           {STATUS_FILTERS.map((f) => (
             <button
               key={f}
               onClick={() => setStatusFilter(f)}
-              className="rounded-lg px-3 py-2 text-[11.5px] font-semibold transition-all"
+              className="whitespace-nowrap rounded-lg px-3 py-2 text-[11.5px] font-semibold transition-all"
               style={{
                 background: statusFilter === f ? M.gold : M.panel,
                 color: statusFilter === f ? "#000000" : M.textMuted,
@@ -239,23 +328,21 @@ export default function OrdersPage() {
           ))}
         </div>
 
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="rounded-lg px-3.5 py-2 text-[12px] font-medium outline-none"
-          style={{ border: `1px solid ${M.border}`, background: M.panel, color: M.white }}
-        >
-          {TYPE_FILTERS.map((t) => <option key={t}>{t}</option>)}
-        </select>
+        <FilterSelect value={typeFilter} options={TYPE_FILTERS} onChange={setTypeFilter} minWidth={110} />
 
-        <select
-          value={companyFilter}
-          onChange={(e) => setCompanyFilter(e.target.value)}
-          className="rounded-lg px-3.5 py-2 text-[12px] font-medium outline-none"
-          style={{ border: `1px solid ${M.border}`, background: M.panel, color: M.white }}
-        >
-          {companyOptions.map((c) => <option key={c}>{c}</option>)}
-        </select>
+        <FilterSelect value={companyFilter} options={companyOptions} onChange={setCompanyFilter} minWidth={150} />
+
+        <FilterSelect value={dayFilter} options={DAY_FILTERS} onChange={setDayFilter} minWidth={130} />
+
+        {dayFilter === "Custom Date" && (
+          <input
+            type="date"
+            value={customDate}
+            onChange={(e) => setCustomDate(e.target.value)}
+            className="flex-none rounded-lg px-3.5 py-2 text-[12px] font-medium outline-none"
+            style={{ border: `1px solid ${M.border}`, background: M.panel, color: M.white }}
+          />
+        )}
       </motion.div>
 
       {/* Table */}
@@ -266,20 +353,104 @@ export default function OrdersPage() {
         className="overflow-hidden rounded-xl"
         style={{ background: M.panel, border: `1px solid ${M.border}` }}
       >
-        <div className="px-6 py-4" style={{ borderBottom: `1px solid ${M.border}` }}>
-          <p className="text-[13px] font-bold" style={{ color: M.white }}>Order List</p>
-          <p className="text-[11.5px]" style={{ color: M.textMuted }}>
-            {filtered.length} {filtered.length === 1 ? "order" : "orders"} found
-          </p>
+        <div className="flex flex-wrap items-center gap-2.5 px-6 py-4" style={{ borderBottom: `1px solid ${M.border}` }}>
+          <button
+            title={selectMode ? `Mark ${selectedIds.size} selected as Delivered` : "Select orders to mark as Delivered"}
+            onClick={() => handleMarkClick("delivered")}
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-[11.5px] font-semibold transition-colors"
+            style={{ border: `1px solid ${M.green}`, color: M.green, background: "transparent" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.green; (e.currentTarget as HTMLElement).style.color = "#000000"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.green; }}
+          >
+            <CheckCircle2 size={14} /> Mark as Delivered
+          </button>
+          <button
+            title={selectMode ? `Mark ${selectedIds.size} selected as Cancelled` : "Select orders to mark as Cancelled"}
+            onClick={() => handleMarkClick("cancelled")}
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-[11.5px] font-semibold transition-colors"
+            style={{ border: `1px solid ${M.red}`, color: M.red, background: "transparent" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.red; (e.currentTarget as HTMLElement).style.color = "#000000"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.red; }}
+          >
+            <Ban size={14} /> Mark as Cancel
+          </button>
+
+          <div
+            className="flex min-w-[280px] flex-1 items-center gap-2.5 rounded-lg px-4 py-2 sm:max-w-[480px] sm:flex-none"
+            style={{ border: `1px solid ${M.border}`, background: M.surface }}
+          >
+            <Search size={14} style={{ color: M.textFaint }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search order by company code and customer name"
+              className="flex-1 bg-transparent text-[13px] outline-none"
+              style={{ color: M.white }}
+            />
+            {search && (
+              <button onClick={() => setSearch("")} style={{ color: M.textMuted }}>
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {selectMode && (
+            <>
+              <span className="text-[11.5px] font-semibold whitespace-nowrap" style={{ color: M.textMuted }}>
+                {selectedIds.size} selected
+              </span>
+              <button
+                title="Cancel selection"
+                onClick={exitSelectMode}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors"
+                style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+              >
+                <X size={14} />
+              </button>
+            </>
+          )}
+
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:opacity-40"
+              style={{ color: M.textMuted }}
+            >
+              <ChevronLeft size={14} />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                onClick={() => setCurrentPage(p)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-medium transition-colors"
+                style={{
+                  background: p === currentPage ? M.gold : "transparent",
+                  color: p === currentPage ? "#000000" : M.textMuted,
+                }}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:opacity-40"
+              style={{ color: M.textMuted }}
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto overflow-y-hidden">
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: M.surface }}>
-                {["Order ID", "Customer", "Company", "Dish(es)", "Type", "Amount", "Status", "Date", ""].map((h) => (
+                {[...(selectMode ? [""] : []), "Order ID", "Customer", "Company", "Dish(es)", "Type", "Amount", "Status", "Date", ""].map((h, i) => (
                   <th
-                    key={h}
+                    key={i}
                     className="whitespace-nowrap px-5 py-3 text-left text-[8.5px] font-bold uppercase tracking-[0.12em]"
                     style={{ color: M.goldMuted, borderBottom: `1px solid ${M.border}` }}
                   >
@@ -289,7 +460,7 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((order, i) => {
+              {orders.map((order, i) => {
                 const label = order.companyCode
                   ? `${order.customerInitials} | ${order.companyCode}`
                   : order.customerInitials;
@@ -301,12 +472,22 @@ export default function OrdersPage() {
                     initial="hidden"
                     animate="show"
                     className="cursor-pointer transition-colors"
-                    style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${M.borderFaint}` : "none" }}
+                    style={{ borderBottom: i < orders.length - 1 ? `1px solid ${M.borderFaint}` : "none" }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
                   >
+                    {selectMode && (
+                      <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(order.id)}
+                          onChange={() => toggleSelected(order.id)}
+                          className="h-4 w-4 cursor-pointer accent-[#f8e396]"
+                        />
+                      </td>
+                    )}
                     <td className="px-5 py-4">
-                      <span className="text-[12px] font-bold" style={{ color: M.gold }}>{order.id}</span>
+                      <span className="text-[12px] font-bold" style={{ color: M.gold }}>{order.orderNumber}</span>
                     </td>
                     <td className="px-5 py-4">
                       <span className="text-[12.5px] font-semibold" style={{ color: M.white }}>{order.customerName}</span>
@@ -339,11 +520,11 @@ export default function OrdersPage() {
                       <StatusBadge status={order.status} />
                     </td>
                     <td className="px-5 py-4">
-                      <span className="text-[12px]" style={{ color: M.textMuted }}>{order.dateDisplay}</span>
+                      <span className="text-[12px]" style={{ color: M.textMuted }}>{order.deliveryDateDisplay}</span>
                     </td>
                     <td className="px-5 py-4">
                       <button
-                        onClick={() => toast.success(`Order ${order.id} — ${order.customerName}`)}
+                        onClick={() => router.push(`/dashboard/orders/detail?id=${order.id}`)}
                         className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
                         style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
                         onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
@@ -359,7 +540,7 @@ export default function OrdersPage() {
           </table>
         </div>
 
-        {filtered.length === 0 && (
+        {!loading && orders.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-16">
             <div className="flex h-14 w-14 items-center justify-center rounded-xl" style={{ background: M.surface }}>
               <ClipboardList size={24} style={{ color: M.textMuted }} />
@@ -369,34 +550,14 @@ export default function OrdersPage() {
           </div>
         )}
 
-        {/* Pagination */}
+        {/* Pagination summary */}
         <div
-          className="flex items-center justify-between px-5 py-3.5"
+          className="flex items-center px-5 py-3.5"
           style={{ borderTop: `1px solid ${M.border}` }}
         >
           <span className="text-[12px]" style={{ color: M.textMuted }}>
-            Showing {filtered.length} of {orders.length} orders
+            Showing {rangeStart}–{rangeEnd} of {total} orders
           </span>
-          <div className="flex items-center gap-1">
-            <button className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors" style={{ color: M.textMuted }}>
-              <ChevronLeft size={14} />
-            </button>
-            {[1, 2, 3].map((p) => (
-              <button
-                key={p}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-medium transition-colors"
-                style={{
-                  background: p === 1 ? M.gold : "transparent",
-                  color: p === 1 ? "#000000" : M.textMuted,
-                }}
-              >
-                {p}
-              </button>
-            ))}
-            <button className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors" style={{ color: M.textMuted }}>
-              <ChevronRight size={14} />
-            </button>
-          </div>
         </div>
       </motion.div>
     </div>

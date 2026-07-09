@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Montserrat } from "next/font/google";
 import { ArrowLeft } from "lucide-react";
-import { getOrders, parseAmount, type Order } from "@/lib/orders-store";
+import { getAllOrders, parseAmount, type Order } from "@/lib/orders-store";
 
 const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
 
@@ -33,7 +33,7 @@ export default function RevenueReportPage() {
   const [customFrom, setCustomFrom] = useState(todayISO);
   const [customTo, setCustomTo] = useState(todayISO);
 
-  useEffect(() => { setOrders(getOrders()); }, []);
+  useEffect(() => { getAllOrders().then(setOrders).catch(() => setOrders([])); }, []);
 
   const filtered = useMemo(() => {
     if (period === "Today") return orders.filter((o) => daysSince(o.dateISO) === 0);

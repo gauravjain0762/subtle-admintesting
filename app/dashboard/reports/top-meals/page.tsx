@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Montserrat } from "next/font/google";
 import { ArrowLeft, UtensilsCrossed } from "lucide-react";
-import { getOrders, type Order } from "@/lib/orders-store";
+import { getAllOrders, type Order } from "@/lib/orders-store";
 import { getDishes, type Dish } from "@/lib/menu-store";
 
 const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
@@ -32,7 +32,7 @@ export default function TopMealsReportPage() {
   const [period, setPeriod] = useState<"This Wk" | "Last Wk">("This Wk");
 
   useEffect(() => {
-    setOrders(getOrders());
+    getAllOrders().then(setOrders).catch(() => setOrders([]));
     getDishes().then(setDishes).catch(() => setDishes([]));
   }, []);
 

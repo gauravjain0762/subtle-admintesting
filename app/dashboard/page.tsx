@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Montserrat } from "next/font/google";
-import { getOrders, parseAmount, type Order } from "@/lib/orders-store";
+import { getAllOrders, parseAmount, type Order } from "@/lib/orders-store";
 import { getMenus, type Menu } from "@/lib/menus-store";
 import { getDishes, type Dish } from "@/lib/menu-store";
 import { getNewEnquiriesCount } from "@/lib/enquiries-store";
@@ -128,8 +128,7 @@ export default function DashboardPage() {
   const [activeSubs, setActiveSubs] = useState(0);
 
   useEffect(() => {
-    const orders = getOrders();
-    setAllOrders(orders);
+    getAllOrders().then(setAllOrders).catch(() => setAllOrders([]));
     setMenus(getMenus());
     getDishes().then(setDishes).catch(() => setDishes([]));
     getNewEnquiriesCount().then(setNewEnquiries).catch(() => setNewEnquiries(0));
@@ -137,7 +136,7 @@ export default function DashboardPage() {
   }, []);
 
   const totalOrdersToday = useMemo(() => allOrders.filter((o) => daysSince(o.dateISO) === 0).length, [allOrders]);
-  const oneOffOrders     = useMemo(() => allOrders.filter((o) => o.type === "one-time").length, [allOrders]);
+  const oneOffOrders     = useMemo(() => allOrders.filter((o) => o.type === "one-off").length, [allOrders]);
   const standardMenuCount = useMemo(() => menus.filter((m) => m.isDefault).length, [menus]);
   const customMenuCount   = useMemo(() => menus.filter((m) => !m.isDefault).length, [menus]);
 

@@ -41,7 +41,7 @@ const NAV: NavEntry[] = [
     ],
   },
   { label: "Meal Management", href: "/dashboard/menu", icon: UtensilsCrossed },
-  { label: "Weekly Menu", href: "/dashboard/weekly-menu", icon: CalendarDays },
+  // { label: "Weekly Menu", href: "/dashboard/weekly-menu", icon: CalendarDays },
   { label: "Orders", href: "/dashboard/orders", icon: ClipboardList },
 ];
 

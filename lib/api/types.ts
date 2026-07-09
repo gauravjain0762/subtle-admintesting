@@ -157,3 +157,55 @@ export interface ApiWeeklyMenuResponse {
     published: boolean;
   };
 }
+
+export type ApiOrderStatus = "new" | "delivered" | "cancelled";
+export type ApiSubscriptionType = "weekly" | "one-off";
+export type ApiPaymentMethod = "card" | "apple_pay" | "google_pay";
+
+export interface ApiOrderItem {
+  dishId: string;
+  dishName: string;
+  quantity: number;
+  unitPrice: string;
+  portion?: string;
+  addOns?: string[];
+}
+
+export interface ApiOrder {
+  _id: string;
+  orderNumber: string;
+  customerName: string;
+  customerId?: string;
+  workspaceId?: string;
+  workspaceCode?: string;
+  workspaceName?: string;
+  items: ApiOrderItem[];
+  /** Observed live as a bare number (e.g. 13.25), not the pre-formatted "£13.25" string the original spec assumed. */
+  totalAmount: number | string;
+  status: ApiOrderStatus;
+  subscriptionType: ApiSubscriptionType;
+  paymentMethod: ApiPaymentMethod;
+  orderDate: string;
+  deliveryDate: string;
+  preferredTime?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiOrderListResponse {
+  success: boolean;
+  orders: ApiOrder[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface ApiOrderResponse {
+  success: boolean;
+  order: ApiOrder;
+}
+
+export interface ApiBulkOrderStatusResponse {
+  success: boolean;
+  updatedCount: number;
+}

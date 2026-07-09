@@ -29,7 +29,7 @@ export default function KitchenPrepPage() {
   const [dishes, setDishes] = useState<Dish[]>([]);
 
   useEffect(() => {
-    setOrders(getTodaysOrders());
+    getTodaysOrders().then(setOrders).catch(() => setOrders([]));
     getDishes().then(setDishes).catch(() => setDishes([]));
   }, []);
 

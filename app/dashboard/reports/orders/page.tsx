@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Montserrat } from "next/font/google";
 import { ArrowLeft } from "lucide-react";
-import { getOrders, type Order } from "@/lib/orders-store";
+import { getAllOrders, type Order } from "@/lib/orders-store";
 
 const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
 
@@ -29,7 +29,7 @@ export default function TotalOrdersReportPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [period, setPeriod] = useState<"Today" | "Week">("Today");
 
-  useEffect(() => { setOrders(getOrders()); }, []);
+  useEffect(() => { getAllOrders().then(setOrders).catch(() => setOrders([])); }, []);
 
   const filtered = useMemo(
     () => orders.filter((o) => period === "Today" ? daysSince(o.dateISO) === 0 : daysSince(o.dateISO) < 7),
