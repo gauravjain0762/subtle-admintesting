@@ -1,6 +1,10 @@
+import { fetchDishes, fetchDish, createDish, updateDish as apiUpdateDish, deleteDish as apiDeleteDish } from "@/lib/api/dishes";
+import type { ApiDish, ApiNutritionalIngredient } from "@/lib/api/types";
+
 export interface Ingredient {
   name: string;
   gramsPerMeal: number;
+  price?: string;
 }
 
 export interface Portion {
@@ -8,10 +12,19 @@ export interface Portion {
   price: string;
 }
 
+/** One free-form nutrition property, e.g. { name: "Calories", value: "680" } or { name: "Fiber", value: "5g" }. */
+export interface NutritionEntry {
+  name: string;
+  value: string;
+}
+
 export interface Dish {
-  id: number;
+  id: string;
   name: string;
   price: string;
+  /** Raw, editable nutrition properties — source of truth for the edit form. */
+  nutrition: NutritionEntry[];
+  /** Convenience numbers derived from `nutrition` (falls back to legacy flat fields for older dishes), for list-table display. */
   kcal: number;
   protein: number;
   carbs: number;
@@ -32,85 +45,145 @@ export interface Dish {
   availableDays: string[];
 }
 
-const INITIAL_DISHES: Dish[] = [
-  { id: 1,  name: "Chicken Katsu Curry",       price: "13.25", kcal: 680, protein: 38, carbs: 62, fat: 24, available: true,  popular: true,  vegan: false, images: [], category: "Main Course", allergens: ["Gluten"],         tags: ["High Protein","Comfort Food"], orders: 284, rating: 4.9, description: "Crispy breaded chicken in a rich katsu curry sauce, served with steamed jasmine rice.", menuId: "standard", ingredients: [{ name: "Chicken", gramsPerMeal: 160 }, { name: "Rice", gramsPerMeal: 180 }, { name: "Katsu Sauce", gramsPerMeal: 80 }], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-  { id: 2,  name: "Mediterranean Salmon",      price: "13.25", kcal: 520, protein: 42, carbs: 12, fat: 30, available: true,  popular: true,  vegan: false, images: [], category: "Main Course", allergens: ["Fish"],           tags: ["Gluten Free","High Protein"],  orders: 218, rating: 4.8, description: "Oven-baked salmon with cherry tomatoes, olives, capers and fresh herbs.", menuId: "standard", ingredients: [{ name: "Salmon", gramsPerMeal: 150 }, { name: "Cherry Tomatoes", gramsPerMeal: 90 }, { name: "Olives", gramsPerMeal: 30 }], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-  { id: 3,  name: "Chicken Teriyaki",          price: "8.50",  kcal: 490, protein: 34, carbs: 58, fat: 14, available: true,  popular: false, vegan: false, images: [], category: "Main Course", allergens: ["Gluten","Soy"],   tags: ["Low Cal"],                      orders: 176, rating: 4.7, description: "Tender chicken glazed in sweet teriyaki sauce with sesame seeds and rice.", menuId: "standard", ingredients: [{ name: "Chicken", gramsPerMeal: 150 }, { name: "Rice", gramsPerMeal: 160 }, { name: "Teriyaki Sauce", gramsPerMeal: 50 }], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-  { id: 4,  name: "Tuscan Bean Soup",          price: "7.00",  kcal: 380, protein: 16, carbs: 48, fat: 8,  available: true,  popular: false, vegan: true,  images: [], category: "Soup",         allergens: [],                  tags: ["Vegan","Low Cal"],             orders: 142, rating: 4.6, description: "Hearty cannellini bean soup with kale, tomatoes and fresh rosemary.", menuId: "standard", ingredients: [{ name: "Cannellini Beans", gramsPerMeal: 140 }, { name: "Kale", gramsPerMeal: 60 }, { name: "Tomatoes", gramsPerMeal: 100 }], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-  { id: 5,  name: "Margherita Focaccia Pizza", price: "8.50",  kcal: 620, protein: 22, carbs: 70, fat: 22, available: true,  popular: false, vegan: false, images: [], category: "Main Course", allergens: ["Gluten","Dairy"], tags: ["Vegetarian","Popular"],        orders: 193, rating: 4.7, description: "Classic margherita on fluffy focaccia base with buffalo mozzarella.", menuId: "standard", ingredients: [{ name: "Focaccia Dough", gramsPerMeal: 200 }, { name: "Mozzarella", gramsPerMeal: 100 }, { name: "Tomatoes", gramsPerMeal: 70 }], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-  { id: 6,  name: "Chicken Pasta",             price: "8.00",  kcal: 580, protein: 35, carbs: 64, fat: 18, available: false, popular: false, vegan: false, images: [], category: "Main Course", allergens: ["Gluten","Dairy"], tags: ["Comfort Food"],                 orders: 98,  rating: 4.5, description: "Penne pasta with grilled chicken, spinach and creamy tomato sauce.", menuId: "standard", ingredients: [{ name: "Chicken", gramsPerMeal: 140 }, { name: "Pasta", gramsPerMeal: 170 }, { name: "Spinach", gramsPerMeal: 40 }], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-  { id: 7,  name: "Caesar Salad Bowl",         price: "9.00",  kcal: 320, protein: 28, carbs: 14, fat: 20, available: true,  popular: false, vegan: false, images: [], category: "Salad",       allergens: ["Dairy","Eggs"],   tags: ["Low Cal","Light"],             orders: 87,  rating: 4.4, description: "Crisp romaine, shaved parmesan, croutons and house Caesar dressing.", menuId: "standard", ingredients: [{ name: "Romaine Lettuce", gramsPerMeal: 120 }, { name: "Parmesan", gramsPerMeal: 30 }, { name: "Chicken", gramsPerMeal: 100 }], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-  { id: 8,  name: "Lemon Herb Chicken",        price: "11.50", kcal: 450, protein: 40, carbs: 30, fat: 12, available: true,  popular: false, vegan: false, images: [], category: "Main Course", allergens: [],                  tags: ["High Protein","Gluten Free"],  orders: 124, rating: 4.8, description: "Grilled chicken breast marinated in lemon, garlic and fresh herbs.", menuId: "standard", ingredients: [{ name: "Chicken", gramsPerMeal: 170 }, { name: "Potato", gramsPerMeal: 180 }, { name: "Green Beans", gramsPerMeal: 70 }], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-  { id: 9,  name: "Grilled Chicken Power Bowl", price: "10.50", kcal: 480, protein: 44, carbs: 32, fat: 16, available: true,  popular: true,  vegan: false, images: [], category: "Main Course", allergens: [],                  tags: ["High Protein","Low Cal"],      orders: 61,  rating: 4.8, description: "Grilled chicken breast over quinoa with roasted broccoli, peppers and a tahini drizzle.", menuId: "corporate-wellness", ingredients: [{ name: "Chicken", gramsPerMeal: 150 }, { name: "Quinoa", gramsPerMeal: 120 }, { name: "Broccoli", gramsPerMeal: 90 }], portions: [{ size: "Regular", price: "10.50" }, { size: "Large", price: "13.00" }], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-  { id: 10, name: "Quinoa & Roasted Veg Salad", price: "9.50",  kcal: 410, protein: 14, carbs: 46, fat: 18, available: true,  popular: false, vegan: true,  images: [], category: "Salad",       allergens: [],                  tags: ["Vegan","Low Cal","Light"],     orders: 38,  rating: 4.6, description: "Tri-colour quinoa with roasted courgette, red onion, chickpeas and a lemon herb dressing.", menuId: "corporate-wellness", ingredients: [{ name: "Quinoa", gramsPerMeal: 130 }, { name: "Chickpeas", gramsPerMeal: 80 }, { name: "Courgette", gramsPerMeal: 70 }], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-  { id: 11, name: "Miso Baked Cod",             price: "12.50", kcal: 440, protein: 38, carbs: 24, fat: 20, available: true,  popular: false, vegan: false, images: [], category: "Main Course", allergens: ["Fish","Soy"],      tags: ["Gluten Free","High Protein"],  orders: 27,  rating: 4.7, description: "Miso-glazed cod fillet with steamed pak choi and brown rice.", menuId: "corporate-wellness", ingredients: [{ name: "Cod", gramsPerMeal: 160 }, { name: "Brown Rice", gramsPerMeal: 150 }, { name: "Pak Choi", gramsPerMeal: 80 }], portions: [], availableDays: ["Mon","Wed","Fri"] },
-  { id: 12, name: "Berry Protein Smoothie Bowl",price: "7.50",  kcal: 360, protein: 24, carbs: 50, fat: 8,  available: true,  popular: false, vegan: false, images: [], category: "Breakfast",   allergens: ["Dairy"],           tags: ["Vegetarian","Low Cal"],        orders: 19,  rating: 4.5, description: "Mixed berry and Greek yoghurt smoothie base topped with granola, chia and fresh berries.", menuId: "corporate-wellness", ingredients: [{ name: "Greek Yoghurt", gramsPerMeal: 150 }, { name: "Mixed Berries", gramsPerMeal: 100 }, { name: "Granola", gramsPerMeal: 40 }], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"] },
-];
+/** Fields the admin edits directly — `kcal`/`protein`/`carbs`/`fat` are derived from `nutrition`, not editable inputs. */
+export type DishInput = Omit<Dish, "id" | "orders" | "rating" | "images" | "kcal" | "protein" | "carbs" | "fat">;
 
-const KEY = "sk_admin_dishes";
-
-function load(): Dish[] {
-  if (typeof window === "undefined") return [...INITIAL_DISHES];
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [...INITIAL_DISHES];
-    const parsed = JSON.parse(raw) as Partial<Dish>[];
-    return parsed.map((d) => ({
-      menuId: "standard", ingredients: [], carbs: 0, fat: 0, images: [], category: "Main Course",
-      allergens: [], portions: [], availableDays: ["Mon","Tue","Wed","Thu","Fri"],
-      ...d,
-    } as Dish));
-  } catch {
-    return [...INITIAL_DISHES];
+function deriveNutrition(d: ApiDish): NutritionEntry[] {
+  if (d.nutritionalIngredients && d.nutritionalIngredients.length > 0) {
+    return d.nutritionalIngredients.map((entry) => {
+      const [key, value] = Object.entries(entry)[0] ?? ["", ""];
+      return { name: key, value: String(value) };
+    });
   }
+  // Fallback for dishes created before the nutritionalIngredients migration — they only have flat scalar fields.
+  const legacy: NutritionEntry[] = [];
+  if (d.kcal !== undefined)    legacy.push({ name: "Calories", value: String(d.kcal) });
+  if (d.protein !== undefined) legacy.push({ name: "Protein",  value: String(d.protein) });
+  if (d.carbs !== undefined)   legacy.push({ name: "Carbs",    value: String(d.carbs) });
+  if (d.fat !== undefined)     legacy.push({ name: "Fat",      value: String(d.fat) });
+  return legacy;
 }
 
-function save(dishes: Dish[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(KEY, JSON.stringify(dishes));
+function numFromNutrition(nutrition: NutritionEntry[], ...aliases: string[]): number {
+  const lower = aliases.map((a) => a.toLowerCase());
+  const hit = nutrition.find((n) => lower.includes(n.name.trim().toLowerCase()));
+  const n = hit ? Number(hit.value) : NaN;
+  return isNaN(n) ? 0 : n;
 }
 
-export function getDishes(): Dish[] {
-  return load();
+/** Converts editable rows into the API's array-of-single-key-object shape, sending numbers where possible and raw strings otherwise (e.g. "35gm"). */
+function toApiNutrition(nutrition: NutritionEntry[]): ApiNutritionalIngredient[] {
+  return nutrition
+    .filter((n) => n.name.trim())
+    .map((n) => {
+      const num = Number(n.value);
+      const value = n.value.trim() !== "" && !isNaN(num) ? num : n.value;
+      return { [n.name.trim()]: value };
+    });
 }
 
-export function getDishIds(): number[] {
-  return load().map((d) => d.id);
+function mapDish(d: ApiDish): Dish {
+  const nutrition = deriveNutrition(d);
+  return {
+    id: d._id,
+    name: d.name,
+    price: d.price,
+    nutrition,
+    kcal:    numFromNutrition(nutrition, "kcal", "calories"),
+    protein: numFromNutrition(nutrition, "protein"),
+    carbs:   numFromNutrition(nutrition, "carbs", "carbohydrates"),
+    fat:     numFromNutrition(nutrition, "fat"),
+    available: d.available,
+    popular: d.popular,
+    vegan: d.vegan,
+    images: d.images ?? [],
+    category: d.category ?? "Main Course",
+    allergens: d.allergens ?? [],
+    tags: d.tags ?? [],
+    orders: d.orders ?? 0,
+    rating: d.rating ?? 0,
+    description: d.description ?? "",
+    menuId: d.menuId ?? "standard",
+    ingredients: d.ingredients ?? [],
+    portions: d.portions ?? [],
+    availableDays: d.availableDays ?? [],
+  };
 }
 
-export function getDish(id: number): Dish | undefined {
-  return load().find((d) => d.id === id);
+/** In-memory cache of the last successful fetch, so navigating list → detail doesn't re-hit the network for data we already have. */
+let cache: Dish[] | null = null;
+
+export async function getDishes(): Promise<Dish[]> {
+  const raw = await fetchDishes();
+  cache = raw.map(mapDish);
+  return cache;
 }
 
-export function getDishesByMenu(menuId: string): Dish[] {
-  return load().filter((d) => d.menuId === menuId);
+export async function getDish(id: string): Promise<Dish | undefined> {
+  const hit = cache?.find((d) => d.id === id);
+  if (hit) return hit;
+  const found = await fetchDish(id);
+  return mapDish(found);
 }
 
-export function addDish(dish: Omit<Dish, "id" | "orders" | "rating">): Dish {
-  const dishes = load();
-  const newDish: Dish = { ...dish, id: Date.now(), orders: 0, rating: 0 };
-  save([newDish, ...dishes]);
-  return newDish;
+export async function getDishesByMenu(menuId: string): Promise<Dish[]> {
+  const all = cache ?? (await getDishes());
+  return all.filter((d) => d.menuId === menuId);
 }
 
-export function updateDish(id: number, patch: Omit<Dish, "id" | "orders" | "rating">): void {
-  const dishes = load();
-  save(dishes.map((d) => d.id === id ? { ...d, ...patch } : d));
+export async function addDish(dish: DishInput, images: (File | string)[]): Promise<Dish> {
+  const created = await createDish({
+    name:        dish.name,
+    price:       dish.price,
+    description: dish.description,
+    category:    dish.category,
+    menuId:      dish.menuId,
+    nutritionalIngredients: toApiNutrition(dish.nutrition),
+    allergens:   dish.allergens,
+    tags:        dish.tags,
+    ingredients: dish.ingredients,
+    portions:    dish.portions,
+    availableDays: dish.availableDays,
+    available:   dish.available,
+    popular:     dish.popular,
+    vegan:       dish.vegan,
+  }, images);
+  cache = null;
+  return mapDish(created);
 }
 
-export function toggleDishAvailable(id: number): boolean {
-  const dishes = load();
-  let next = false;
-  save(dishes.map((d) => {
-    if (d.id !== id) return d;
-    next = !d.available;
-    return { ...d, available: next };
-  }));
+/** Pass `images` only if the admin changed them — omitting it leaves existing images untouched (the API replaces the whole array, no merge, whenever the field is present at all). */
+export async function updateDish(id: string, patch: DishInput, images?: (File | string)[]): Promise<void> {
+  await apiUpdateDish(id, {
+    name:        patch.name,
+    price:       patch.price,
+    description: patch.description,
+    category:    patch.category,
+    menuId:      patch.menuId,
+    nutritionalIngredients: toApiNutrition(patch.nutrition),
+    allergens:   patch.allergens,
+    tags:        patch.tags,
+    ingredients: patch.ingredients,
+    portions:    patch.portions,
+    availableDays: patch.availableDays,
+    available:   patch.available,
+    popular:     patch.popular,
+    vegan:       patch.vegan,
+  }, images);
+  cache = null;
+}
+
+export async function toggleDishAvailable(id: string): Promise<boolean> {
+  const dish = await getDish(id);
+  const next = !dish?.available;
+  await apiUpdateDish(id, { available: next });
+  cache = null;
   return next;
 }
 
-export function deleteDish(id: number): void {
-  save(load().filter((d) => d.id !== id));
+export async function deleteDish(id: string): Promise<void> {
+  await apiDeleteDish(id);
+  cache = null;
 }
 
 export const TAG_COLORS: Record<string, { background: string; color: string }> = {

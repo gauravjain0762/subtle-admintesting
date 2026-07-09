@@ -7,10 +7,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Eye, Check, MoreVertical, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
-  getEnquiries, approveEnquiry, rejectEnquiry, employeeRangeLabel,
-  type Enquiry,
+  getEnquiries, approveEnquiry, rejectEnquiry,
+  type Enquiry, type EnquiryStatus,
 } from "@/lib/enquiries-store";
-import { LOGO_COLORS } from "@/lib/companies-store";
+import { LOGO_COLORS, generateCode } from "@/lib/companies-store";
+import { ApiError } from "@/lib/api/client";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -34,13 +36,82 @@ const M = {
   red: "#ff6b6b",
 };
 
+const STATUS_CFG: Record<EnquiryStatus, { label: string; color: string; bg: string }> = {
+  new:      { label: "Pending",  color: M.gold,  bg: "#2a2400" },
+  approved: { label: "Approved", color: M.green, bg: "#0d2a1a" },
+  rejected: { label: "Rejected", color: M.red,   bg: "#2a0a0a" },
+};
+
+function RejectModal({ enquiry, working, onConfirm, onClose }: {
+  enquiry: Enquiry; working: boolean;
+  onConfirm: (reason: string) => void; onClose: () => void;
+}) {
+  const [reason, setReason] = useState("Outside our current delivery area");
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 420, damping: 30 }}
+        className="w-full max-w-[420px] rounded-2xl p-6"
+        style={{ background: M.panel, border: `1px solid ${M.border}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="mb-1 text-[15px] font-bold" style={{ color: M.white }}>Reject &ldquo;{enquiry.workspaceName}&rdquo;</h2>
+        <p className="mb-4 text-[12px]" style={{ color: M.textMuted }}>Provide a reason — this is sent to the applicant.</p>
+        <textarea
+          rows={3}
+          value={reason}
+          onChange={(ev) => setReason(ev.target.value)}
+          className="w-full resize-none rounded-lg px-3.5 py-2.5 text-[13px] outline-none"
+          style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
+        />
+        <div className="mt-5 flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={working}
+            className="flex-1 rounded-lg py-2.5 text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+            style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(reason.trim() || "Outside our current delivery area")}
+            disabled={working}
+            className="flex-1 rounded-lg py-2.5 text-[12.5px] font-bold transition-opacity disabled:opacity-60"
+            style={{ background: M.red, color: "#000000" }}
+          >
+            {working ? "Rejecting…" : "Reject Request"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function CompanyRequestsPage() {
   const router = useRouter();
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [workingId, setWorkingId] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<Enquiry | null>(null);
 
-  const refresh = () => setEnquiries(getEnquiries());
+  const refresh = () => {
+    setLoading(true);
+    getEnquiries()
+      .then(setEnquiries)
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to load requests"))
+      .finally(() => setLoading(false));
+  };
   useEffect(() => { refresh(); }, []);
 
   const filtered = enquiries.filter((e) => {
@@ -51,16 +122,32 @@ export default function CompanyRequestsPage() {
       e.businessType.toLowerCase().includes(q);
   });
 
-  const handleApprove = (e: Enquiry) => {
-    approveEnquiry(e.id);
-    refresh();
-    toast.success(`"${e.workspaceName}" approved — company created`);
+  const handleApprove = async (e: Enquiry) => {
+    setWorkingId(e.id);
+    try {
+      const code = generateCode(e.workspaceName);
+      await approveEnquiry(e.id, code);
+      refresh();
+      toast.success(`"${e.workspaceName}" approved — code ${code}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to approve request");
+    } finally {
+      setWorkingId(null);
+    }
   };
 
-  const handleReject = (e: Enquiry) => {
-    rejectEnquiry(e.id);
-    refresh();
-    toast.error(`"${e.workspaceName}" rejected`);
+  const handleReject = async (e: Enquiry, reason: string) => {
+    setWorkingId(e.id);
+    try {
+      await rejectEnquiry(e.id, reason);
+      refresh();
+      toast.error(`"${e.workspaceName}" rejected`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to reject request");
+    } finally {
+      setWorkingId(null);
+      setRejectTarget(null);
+    }
   };
 
   return (
@@ -100,11 +187,11 @@ export default function CompanyRequestsPage() {
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl" style={{ background: M.panel, border: `1px solid ${M.border}` }}>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-hidden">
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: M.surface }}>
-                {["Company", "Details", "Business Type", "Total Employees", "Address", "Actions"].map((h) => (
+                {["Company", "Details", "Business Type", "Total Employees", "Address", "Status", "Actions"].map((h) => (
                   <th
                     key={h}
                     className="whitespace-nowrap px-3.5 py-3 text-left text-[8.5px] font-bold uppercase tracking-[0.1em]"
@@ -148,8 +235,8 @@ export default function CompanyRequestsPage() {
                     <span className="text-[12px]" style={{ color: "#cccccc" }}>{e.businessType}</span>
                   </td>
                   <td className="px-3.5 py-3.5 text-center">
-                    <span className="text-[13px] font-bold" style={{ color: M.white }} title={`${e.totalEmployees} employees`}>
-                      {employeeRangeLabel(e.totalEmployees)}
+                    <span className="text-[13px] font-bold" style={{ color: M.white }}>
+                      {e.totalEmployees || "—"}
                     </span>
                   </td>
                   <td className="max-w-[180px] px-3.5 py-3.5">
@@ -158,63 +245,65 @@ export default function CompanyRequestsPage() {
                     </span>
                   </td>
                   <td className="px-3.5 py-3.5">
-                    <div className="relative inline-block" onClick={(ev) => ev.stopPropagation()}>
+                    <span
+                      className="inline-flex items-center rounded-md px-2.5 py-1 text-[10.5px] font-bold"
+                      style={{ background: STATUS_CFG[e.status].bg, color: STATUS_CFG[e.status].color, border: `1px solid ${STATUS_CFG[e.status].color}` }}
+                    >
+                      {STATUS_CFG[e.status].label}
+                    </span>
+                  </td>
+                  <td className="px-3.5 py-3.5">
+                    <RowActionsMenu
+                      open={openMenuId === e.id}
+                      onOpenChange={(v) => setOpenMenuId(v ? e.id : null)}
+                      menuStyle={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
+                      trigger={
+                        <button
+                          onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
+                          className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                          style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+                          onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.color = M.gold; (ev.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
+                          onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.color = M.textMuted; (ev.currentTarget as HTMLElement).style.borderColor = M.border; }}
+                          aria-label="Actions"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                      }
+                    >
                       <button
-                        onClick={() => setOpenMenuId((v) => (v === e.id ? null : e.id))}
-                        className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
-                        style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
-                        onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.color = M.gold; (ev.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
-                        onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.color = M.textMuted; (ev.currentTarget as HTMLElement).style.borderColor = M.border; }}
-                        aria-label="Actions"
+                        onClick={() => { setOpenMenuId(null); router.push(`/dashboard/company-management/requests/detail?id=${e.id}`); }}
+                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
+                        style={{ color: "#aaaaaa" }}
+                        onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.background = M.surface; (ev.currentTarget as HTMLElement).style.color = M.gold; }}
+                        onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.background = "transparent"; (ev.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
                       >
-                        <MoreVertical size={14} />
+                        <Eye size={13} /> View
                       </button>
-
-                      <AnimatePresence>
-                        {openMenuId === e.id && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                            transition={{ duration: 0.14 }}
-                            className="absolute right-0 top-[calc(100%+6px)] z-[90] min-w-[170px] rounded-lg p-1.5"
-                            style={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
-                          >
-                            <button
-                              onClick={() => { setOpenMenuId(null); router.push(`/dashboard/company-management/requests/${e.id}`); }}
-                              className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
-                              style={{ color: "#aaaaaa" }}
-                              onMouseEnter={(ev) => { (ev.currentTarget as HTMLElement).style.background = M.surface; (ev.currentTarget as HTMLElement).style.color = M.gold; }}
-                              onMouseLeave={(ev) => { (ev.currentTarget as HTMLElement).style.background = "transparent"; (ev.currentTarget as HTMLElement).style.color = "#aaaaaa"; }}
-                            >
-                              <Eye size={13} /> View
-                            </button>
-                            {e.status === "new" && (
-                              <>
-                                <button
-                                  onClick={() => { setOpenMenuId(null); handleApprove(e); }}
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
-                                  style={{ color: M.green }}
-                                  onMouseEnter={(ev) => ((ev.currentTarget as HTMLElement).style.background = M.surface)}
-                                  onMouseLeave={(ev) => ((ev.currentTarget as HTMLElement).style.background = "transparent")}
-                                >
-                                  <Check size={13} /> Approve
-                                </button>
-                                <button
-                                  onClick={() => { setOpenMenuId(null); handleReject(e); }}
-                                  className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
-                                  style={{ color: M.red }}
-                                  onMouseEnter={(ev) => ((ev.currentTarget as HTMLElement).style.background = M.surface)}
-                                  onMouseLeave={(ev) => ((ev.currentTarget as HTMLElement).style.background = "transparent")}
-                                >
-                                  <XIcon size={13} /> Reject
-                                </button>
-                              </>
-                            )}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
+                      {e.status !== "approved" && (
+                        <button
+                          onClick={() => { setOpenMenuId(null); handleApprove(e); }}
+                          disabled={workingId === e.id}
+                          className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                          style={{ color: M.green }}
+                          onMouseEnter={(ev) => ((ev.currentTarget as HTMLElement).style.background = M.surface)}
+                          onMouseLeave={(ev) => ((ev.currentTarget as HTMLElement).style.background = "transparent")}
+                        >
+                          <Check size={13} /> {workingId === e.id ? "Approving…" : "Approve"}
+                        </button>
+                      )}
+                      {e.status === "new" && (
+                        <button
+                          onClick={() => { setOpenMenuId(null); setRejectTarget(e); }}
+                          disabled={workingId === e.id}
+                          className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                          style={{ color: M.red }}
+                          onMouseEnter={(ev) => ((ev.currentTarget as HTMLElement).style.background = M.surface)}
+                          onMouseLeave={(ev) => ((ev.currentTarget as HTMLElement).style.background = "transparent")}
+                        >
+                          <XIcon size={13} /> Reject
+                        </button>
+                      )}
+                    </RowActionsMenu>
                   </td>
                 </motion.tr>
               ))}
@@ -222,12 +311,29 @@ export default function CompanyRequestsPage() {
           </table>
         </div>
 
-        {filtered.length === 0 && (
+        {loading && enquiries.length === 0 && (
+          <p className="px-4 py-10 text-center text-[12px]" style={{ color: M.textMuted }}>
+            Loading requests…
+          </p>
+        )}
+
+        {!loading && filtered.length === 0 && (
           <p className="px-4 py-10 text-center text-[12px]" style={{ color: M.textMuted }}>
             No requests match your search.
           </p>
         )}
       </div>
+
+      <AnimatePresence>
+        {rejectTarget && (
+          <RejectModal
+            enquiry={rejectTarget}
+            working={workingId === rejectTarget.id}
+            onClose={() => setRejectTarget(null)}
+            onConfirm={(reason) => handleReject(rejectTarget, reason)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

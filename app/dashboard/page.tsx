@@ -131,8 +131,8 @@ export default function DashboardPage() {
     const orders = getOrders();
     setAllOrders(orders);
     setMenus(getMenus());
-    setDishes(getDishes());
-    setNewEnquiries(getNewEnquiriesCount());
+    getDishes().then(setDishes).catch(() => setDishes([]));
+    getNewEnquiriesCount().then(setNewEnquiries).catch(() => setNewEnquiries(0));
     setActiveSubs(getActiveWeeklySubscriptionsCount());
   }, []);
 
@@ -148,7 +148,7 @@ export default function DashboardPage() {
 
   const topMealToday = useMemo(() => {
     const orders = allOrders.filter((o) => daysSince(o.dateISO) === 0);
-    const qtyByDish = new Map<number, number>();
+    const qtyByDish = new Map<string, number>();
     for (const o of orders) {
       for (const item of o.items) {
         qtyByDish.set(item.dishId, (qtyByDish.get(item.dishId) ?? 0) + item.quantity);

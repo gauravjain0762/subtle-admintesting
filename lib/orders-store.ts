@@ -1,7 +1,8 @@
 import { CheckCircle2, Sparkles } from "lucide-react";
 
 export interface OrderLineItem {
-  dishId: number;
+  /** Mock orders reference legacy numeric-string ids ("1".."8") that won't match real dish _ids from the API — orders remain unintegrated mock data. */
+  dishId: string;
   dishName: string;
   quantity: number;
   unitPrice: string;
@@ -44,7 +45,7 @@ function displayDate(daysAgo: number): string {
 }
 
 function line(dishId: number, dishName: string, unitPrice: string, quantity = 1): OrderLineItem {
-  return { dishId, dishName, quantity, unitPrice };
+  return { dishId: String(dishId), dishName, quantity, unitPrice };
 }
 
 function total(items: OrderLineItem[]): string {

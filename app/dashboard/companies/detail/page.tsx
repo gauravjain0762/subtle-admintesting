@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Montserrat } from "next/font/google";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Building2, Mail, Phone, MapPin,
   Users, Calendar, Briefcase, Clock, Globe,
-  Copy, Power, UtensilsCrossed,
+  Copy, Power, UtensilsCrossed, ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getCompany, getCompanyIds, setCompanyStatus, type Company } from "@/lib/companies-store";
+import { getCompany, setCompanyStatus, type Company } from "@/lib/companies-store";
 import { getMenu } from "@/lib/menus-store";
+import { ApiError } from "@/lib/api/client";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -35,35 +36,53 @@ const M = {
 };
 
 const STATUS_DISPLAY_M: Record<string, { label: string; color: string }> = {
-  active:   { label: "Active",   color: M.green },
-  inactive: { label: "Inactive", color: M.red },
+  active:    { label: "Active",    color: M.green },
+  suspended: { label: "Inactive", color: M.red },
 };
-
-export const dynamicParams = false;
-
-export function generateStaticParams() {
-  return getCompanyIds().map((id) => ({ id }));
-}
 
 const fade = (delay = 0) => ({
   initial: { opacity: 0, y: 18 },
   animate: { opacity: 1, y: 0 },
-  transition: { delay, duration: 0.42, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] },
+  transition: { delay, duration: 0.42, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
 });
 
-export default function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id }  = use(params);
-  const router  = useRouter();
+export default function CompanyDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <CompanyDetailContent />
+    </Suspense>
+  );
+}
+
+function CompanyDetailContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id") ?? "";
 
   const [company, setCompanyData] = useState<Company | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
-    const found = getCompany(id);
-    if (!found) { router.replace("/dashboard/companies"); return; }
-    setCompanyData(found);
+    if (!id) { router.replace("/dashboard/companies"); return; }
+    let cancelled = false;
+    setLoading(true);
+    getCompany(id)
+      .then((found) => {
+        if (cancelled) return;
+        if (!found) { router.replace("/dashboard/companies"); return; }
+        setCompanyData(found);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        toast.error(err instanceof ApiError ? err.message : "Failed to load company");
+        router.replace("/dashboard/companies");
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [id, router]);
 
-  if (!company) return null;
+  if (loading || !company) return null;
 
   const sd = STATUS_DISPLAY_M[company.status] ?? STATUS_DISPLAY_M.active;
   const assignedMenu = getMenu(company.menuId ?? "standard");
@@ -77,11 +96,19 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
     toast.success(`Code "${company.code}" sent to ${company.email}`);
   };
 
-  const toggleStatus = () => {
-    const next = company.status === "active" ? "inactive" : "active";
-    setCompanyStatus(id, next);
-    setCompanyData(getCompany(id) ?? null);
-    toast.success(`"${company.name}" marked ${next}`);
+  const toggleStatus = async () => {
+    const next = company.status === "active" ? "suspended" : "active";
+    setToggling(true);
+    try {
+      await setCompanyStatus(id, next);
+      const refreshed = await getCompany(id);
+      setCompanyData(refreshed ?? null);
+      toast.success(`"${company.name}" marked ${next}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to update status");
+    } finally {
+      setToggling(false);
+    }
   };
 
   return (
@@ -116,14 +143,15 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           </div>
           <div>
             <p className="text-[9.5px] font-bold uppercase tracking-[0.14em]" style={{ color: M.textFaint }}>Company Code</p>
-            <p className="mt-0.5 font-mono text-[22px] font-bold tracking-widest" style={{ color: M.gold }}>{company.code}</p>
+            <p className="mt-0.5 font-mono text-[22px] font-bold tracking-widest" style={{ color: M.gold }}>{company.code || "—"}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <motion.button
             whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
             onClick={copyCode}
-            className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-[12.5px] font-semibold"
+            disabled={!company.code}
+            className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-[12.5px] font-semibold disabled:opacity-40"
             style={{ background: M.gold, color: "#000000" }}
           >
             <Copy size={13} /> Copy Code
@@ -131,7 +159,8 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           <motion.button
             whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
             onClick={sendCodeToMail}
-            className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-[12.5px] font-semibold transition-colors"
+            disabled={!company.code}
+            className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-[12.5px] font-semibold transition-colors disabled:opacity-40"
             style={{ border: `1px solid ${M.gold}`, color: M.gold, background: "transparent" }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.gold; (e.currentTarget as HTMLElement).style.color = "#000000"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.gold; }}
@@ -146,13 +175,12 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         <h2 className="mb-5 text-[13px] font-bold" style={{ color: M.white }}>Workspace Details</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {[
-            { icon: Building2, label: "Company Name", value: company.name    },
-            { icon: Briefcase, label: "Business Type", value: company.industry },
-            { icon: MapPin,    label: "Address",      value: company.address || "—" },
-            { icon: MapPin,    label: "Town",         value: company.town || "—" },
-            { icon: MapPin,    label: "City",         value: company.city    },
-            { icon: MapPin,    label: "Postal Code",  value: company.postalCode || "—" },
-            { icon: Globe,     label: "Country",      value: company.country || "—" },
+            { icon: Building2, label: "Company Name",  value: company.name },
+            { icon: Briefcase, label: "Business Type", value: company.industry || "—" },
+            { icon: MapPin,    label: "Town",           value: company.town || "—" },
+            { icon: MapPin,    label: "City",           value: company.city || "—" },
+            { icon: MapPin,    label: "Postal Code",    value: company.postalCode || "—" },
+            { icon: Globe,     label: "Employees",      value: company.employees || "—" },
             { icon: UtensilsCrossed, label: "Assigned Menu", value: assignedMenu?.name ?? "Standard Menu" },
           ].map(({ icon: Icon, label, value }) => (
             <div key={label} className="flex items-center gap-3">
@@ -201,10 +229,12 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         <h2 className="mb-5 text-[13px] font-bold" style={{ color: M.white }}>Contact Details</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {[
-            { icon: Users,     label: "HR Contact",   value: company.contact },
-            { icon: Mail,      label: "Email",        value: company.email   },
-            { icon: Phone,     label: "Phone",        value: company.phone   },
-            { icon: Calendar,  label: "Client Since", value: company.since   },
+            { icon: Users,     label: "Contact Name", value: company.contact || "—" },
+            { icon: Mail,      label: "Email",        value: company.email || "—" },
+            { icon: Phone,     label: "Phone",        value: company.phone || "—" },
+            { icon: Users,     label: "Total Users",  value: String(company.totalUsers) },
+            { icon: ShoppingBag, label: "Active Orders", value: String(company.activeOrders) },
+            { icon: Calendar,  label: "Client Since", value: company.since },
           ].map(({ icon: Icon, label, value }) => (
             <div key={label} className="flex items-center gap-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: M.surface }}>
@@ -243,18 +273,19 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {(() => {
-          const target = company.status === "active" ? "inactive" : "active";
+          const target = company.status === "active" ? "suspended" : "active";
           const tCfg = STATUS_DISPLAY_M[target];
           return (
             <motion.button
-              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: toggling ? 1 : 1.04 }} whileTap={{ scale: 0.96 }}
               onClick={toggleStatus}
-              className="flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-[12.5px] font-semibold transition-colors"
+              disabled={toggling}
+              className="flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-[12.5px] font-semibold transition-colors disabled:opacity-60"
               style={{ border: `1px solid ${tCfg.color}`, color: tCfg.color }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = tCfg.color; (e.currentTarget as HTMLElement).style.color = "#000000"; }}
+              onMouseEnter={(e) => { if (!toggling) { (e.currentTarget as HTMLElement).style.background = tCfg.color; (e.currentTarget as HTMLElement).style.color = "#000000"; } }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = tCfg.color; }}
             >
-              <Power size={13} /> Set {tCfg.label}
+              <Power size={13} /> {toggling ? "Updating…" : `Set ${tCfg.label}`}
             </motion.button>
           );
         })()}

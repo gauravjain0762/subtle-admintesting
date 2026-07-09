@@ -4,6 +4,7 @@ import { Bell, Menu, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { SkLogoMark } from "@/components/ui/sk-logo";
+import { logout } from "@/lib/api/auth";
 
 interface TopbarProps {
   onMobileMenuOpen: () => void;
@@ -15,6 +16,7 @@ export function Topbar({ onMobileMenuOpen, sidebarWidth = 264 }: TopbarProps) {
   const router = useRouter();
 
   const handleLogout = () => {
+    logout();
     toast.success("Signed out successfully");
     router.push("/login");
   };

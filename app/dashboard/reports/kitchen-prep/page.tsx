@@ -30,11 +30,11 @@ export default function KitchenPrepPage() {
 
   useEffect(() => {
     setOrders(getTodaysOrders());
-    setDishes(getDishes());
+    getDishes().then(setDishes).catch(() => setDishes([]));
   }, []);
 
   const { perDish, grandTotals } = useMemo(() => {
-    const qtyByDish = new Map<number, number>();
+    const qtyByDish = new Map<string, number>();
     for (const order of orders) {
       for (const item of order.items) {
         qtyByDish.set(item.dishId, (qtyByDish.get(item.dishId) ?? 0) + item.quantity);

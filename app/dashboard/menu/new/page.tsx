@@ -12,6 +12,7 @@ import {
 } from "@/lib/menu-store";
 import { getMenus, getDefaultMenu, type Menu } from "@/lib/menus-store";
 import { SKToggle } from "@/components/ui/sk-toggle";
+import { ApiError } from "@/lib/api/client";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -33,14 +34,18 @@ const M = {
   red: "#ff6b6b",
 };
 
+const DEFAULT_NUTRITION = [
+  { name: "Calories", value: "" },
+  { name: "Protein", value: "" },
+  { name: "Carbs", value: "" },
+  { name: "Fat", value: "" },
+];
+
 const EMPTY = {
   name: "",
   price: "",
-  kcal: "",
-  protein: "",
-  carbs: "",
-  fat: "",
-  images: [] as string[],
+  nutrition: DEFAULT_NUTRITION as { name: string; value: string }[],
+  images: [] as (File | string)[],
   category: CATEGORIES[0],
   allergens: [] as string[],
   tags: [] as string[],
@@ -61,6 +66,8 @@ export default function NewDishPage() {
   const [menus, setMenus]         = useState<Menu[]>([]);
   const [menuOpen, setMenuOpen]   = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
   useEffect(() => {
     const allMenus = getMenus();
@@ -73,6 +80,14 @@ export default function NewDishPage() {
     setForm((f) => ({ ...f, menuId: initialMenuId }));
   }, []);
 
+  useEffect(() => {
+    const urls = form.images.map((img) => (img instanceof File ? URL.createObjectURL(img) : img));
+    setPreviewUrls(urls);
+    return () => {
+      urls.forEach((url, i) => { if (form.images[i] instanceof File) URL.revokeObjectURL(url); });
+    };
+  }, [form.images]);
+
   const set = <K extends keyof typeof EMPTY>(k: K, v: (typeof EMPTY)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
@@ -82,8 +97,20 @@ export default function NewDishPage() {
       tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag],
     }));
 
+  const addNutritionRow = () =>
+    setForm((f) => ({ ...f, nutrition: [...f.nutrition, { name: "", value: "" }] }));
+
+  const updateNutritionRow = (i: number, patch: Partial<{ name: string; value: string }>) =>
+    setForm((f) => ({
+      ...f,
+      nutrition: f.nutrition.map((n, idx) => (idx === i ? { ...n, ...patch } : n)),
+    }));
+
+  const removeNutritionRow = (i: number) =>
+    setForm((f) => ({ ...f, nutrition: f.nutrition.filter((_, idx) => idx !== i) }));
+
   const addIngredientRow = () =>
-    setForm((f) => ({ ...f, ingredients: [...f.ingredients, { name: "", gramsPerMeal: 0 }] }));
+    setForm((f) => ({ ...f, ingredients: [...f.ingredients, { name: "", gramsPerMeal: 0, price: "" }] }));
 
   const updateIngredientRow = (i: number, patch: Partial<Ingredient>) =>
     setForm((f) => ({
@@ -114,12 +141,7 @@ export default function NewDishPage() {
     if (!file) return;
     if (!file.type.startsWith("image/")) { toast.error("Please choose an image file"); return; }
     if (file.size > 2 * 1024 * 1024) { toast.error("Image must be under 2MB"); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setForm((f) => (f.images.length >= MAX_IMAGES ? f : { ...f, images: [...f.images, dataUrl] }));
-    };
-    reader.readAsDataURL(file);
+    setForm((f) => (f.images.length >= MAX_IMAGES ? f : { ...f, images: [...f.images, file] }));
   };
 
   const removeImageRow = (i: number) =>
@@ -139,41 +161,39 @@ export default function NewDishPage() {
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.name.trim())                          e.name    = "Dish name is required";
-    if (!form.price || isNaN(Number(form.price)))   e.price   = "Valid price required";
-    if (!form.kcal  || isNaN(Number(form.kcal)))    e.kcal    = "Valid calories required";
-    if (!form.protein || isNaN(Number(form.protein)))e.protein = "Valid protein required";
+    if (!form.name.trim())                        e.name    = "Dish name is required";
+    if (!form.price || isNaN(Number(form.price))) e.price   = "Valid price required";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return;
-    const dish = addDish({
-      name:        form.name.trim(),
-      price:       parseFloat(form.price).toFixed(2),
-      kcal:        Number(form.kcal),
-      protein:     Number(form.protein),
-      carbs:       Number(form.carbs) || 0,
-      fat:         Number(form.fat) || 0,
-      images:      form.images.filter((url) => url.trim()),
-      category:    form.category,
-      allergens:   form.allergens,
-      tags:        form.tags,
-      description: form.description,
-      available:   form.available,
-      popular:     form.popular,
-      vegan:       form.vegan,
-      menuId:      form.menuId,
-      ingredients: form.ingredients.filter((ing) => ing.name.trim()),
-      portions:    form.portions.filter((p) => p.size.trim()),
-      availableDays: form.availableDays,
-    });
-    toast.success(`"${dish.name}" added to menu!`);
-    router.push("/dashboard/menu");
+    setSaving(true);
+    try {
+      const dish = await addDish({
+        name:        form.name.trim(),
+        price:       parseFloat(form.price).toFixed(2),
+        nutrition:   form.nutrition.filter((n) => n.name.trim()),
+        category:    form.category,
+        allergens:   form.allergens,
+        tags:        form.tags,
+        description: form.description,
+        available:   form.available,
+        popular:     form.popular,
+        vegan:       form.vegan,
+        menuId:      form.menuId,
+        ingredients: form.ingredients.filter((ing) => ing.name.trim()),
+        portions:    form.portions.filter((p) => p.size.trim()),
+        availableDays: form.availableDays,
+      }, form.images);
+      toast.success(`"${dish.name}" added to menu!`);
+      router.push("/dashboard/menu");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to add dish");
+      setSaving(false);
+    }
   };
-
-  const cover = form.images.find((url) => url.trim());
 
   return (
     <div className={montserrat.className}>
@@ -189,12 +209,21 @@ export default function NewDishPage() {
         <ArrowLeft size={12} /> Back
       </button>
 
-      <h1 className="text-[24px] font-bold tracking-tight" style={{ color: M.gold }}>Add New Dish</h1>
-      <p className="mt-0.5 text-[12px]" style={{ color: "#D0C5AF" }}>Fill in the details to add a dish to the menu</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[24px] font-bold tracking-tight" style={{ color: M.gold }}>Add Menu</h1>
+          <p className="mt-0.5 text-[12px]" style={{ color: "#D0C5AF" }}>Fill in the details to add a dish to the menu</p>
+        </div>
+        <div className="flex items-center gap-3 rounded-lg px-4 py-3" style={{ background: M.surface, border: `1px solid ${M.border}` }}>
+          <div>
+            <p className="text-[13px] font-semibold" style={{ color: M.white }}>Available</p>
+            <p className="text-[11px]" style={{ color: M.textMuted }}>Show on customer menu</p>
+          </div>
+          <SKToggle on={form.available} onChange={() => set("available", !form.available)} />
+        </div>
+      </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-        {/* ── Main column ── */}
-        <div className="space-y-5 lg:col-span-2">
+      <div className="mt-6 space-y-5 pb-6">
           {/* ── Basic info ── */}
           <SectionCard label="Basic Info">
             <div className="space-y-4">
@@ -259,7 +288,7 @@ export default function NewDishPage() {
           {/* ── Images ── */}
           <SectionCard label={`Images (max ${MAX_IMAGES})`} hint="The first image is used as the dish's cover photo.">
             <div className="flex flex-wrap gap-3">
-              {form.images.map((url, i) => (
+              {previewUrls.map((url, i) => (
                 <div key={i} className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-lg" style={{ border: `1px solid ${M.border}` }}>
                   {url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -300,23 +329,51 @@ export default function NewDishPage() {
           </SectionCard>
 
           {/* ── Nutritional Information ── */}
-          <SectionCard label="Nutritional Information">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {(["kcal","protein","carbs","fat"] as const).map((k) => (
-                <Field key={k}
-                  label={k === "kcal" ? "Calories" : k === "protein" ? "Protein (g)" : k === "carbs" ? "Carbs (g)" : "Fat (g)"}
-                  required={k === "kcal" || k === "protein"} error={errors[k]}
-                >
-                  <Input
-                    value={form[k]}
-                    placeholder={k === "kcal" ? "480" : k === "protein" ? "32" : k === "carbs" ? "45" : "18"}
-                    type="number"
-                    onChange={(v) => { set(k, v); setErrors((e) => ({ ...e, [k]: "" })); }}
-                    error={!!errors[k]}
+          <SectionCard label="Nutritional Information" hint="Add or remove nutrition properties freely — every property you add is saved, with or without units (e.g. 680 or 35g).">
+            <div className="space-y-2.5">
+              {form.nutrition.map((n, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  <input
+                    type="text"
+                    value={n.name}
+                    onChange={(e) => updateNutritionRow(i, { name: e.target.value })}
+                    placeholder="e.g. Calories"
+                    className="flex-1 rounded-lg px-4 py-2.5 text-[13px] outline-none transition-all"
+                    style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
+                    onFocus={(e) => (e.target.style.borderColor = M.gold)}
+                    onBlur={(e)  => (e.target.style.borderColor = M.border)}
                   />
-                </Field>
+                  <div className="w-32">
+                    <input
+                      type="text"
+                      value={n.value}
+                      onChange={(e) => updateNutritionRow(i, { value: e.target.value })}
+                      placeholder="e.g. 680"
+                      className="w-full rounded-lg px-4 py-2.5 text-[13px] outline-none transition-all"
+                      style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
+                      onFocus={(e) => (e.target.style.borderColor = M.gold)}
+                      onBlur={(e)  => (e.target.style.borderColor = M.border)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeNutritionRow(i)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors"
+                    style={{ border: `1px solid ${M.border}`, color: M.red }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               ))}
             </div>
+            <button
+              type="button"
+              onClick={addNutritionRow}
+              className="mt-3 flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12px] font-semibold transition-colors"
+              style={{ border: `1px solid ${M.border}`, color: M.textMuted, background: M.surface }}
+            >
+              <Plus size={12} /> Add Property
+            </button>
 
             <div className="mt-4">
               <label className="mb-1.5 block text-[11.5px] font-semibold" style={{ color: M.textMuted }}>Allergens</label>
@@ -345,8 +402,8 @@ export default function NewDishPage() {
             </div>
           </SectionCard>
 
-          {/* ── Ingredients ── */}
-          <SectionCard label="Ingredients (grams per meal)" hint="Used to calculate how much to buy on the Kitchen Prep report.">
+          {/* ── Addons ── */}
+          <SectionCard label="Addons (grams per meal)" hint="Used to calculate how much to buy on the Kitchen Prep report. Price is optional.">
             <div className="space-y-2.5">
               {form.ingredients.map((ing, i) => (
                 <div key={i} className="flex items-center gap-2.5">
@@ -360,7 +417,7 @@ export default function NewDishPage() {
                     onFocus={(e) => (e.target.style.borderColor = M.gold)}
                     onBlur={(e)  => (e.target.style.borderColor = M.border)}
                   />
-                  <div className="relative w-32">
+                  <div className="relative w-28">
                     <input
                       type="number"
                       value={ing.gramsPerMeal || ""}
@@ -372,6 +429,19 @@ export default function NewDishPage() {
                       onBlur={(e)  => (e.target.style.borderColor = M.border)}
                     />
                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: M.textMuted }}>g</span>
+                  </div>
+                  <div className="relative w-28">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px]" style={{ color: M.textMuted }}>£</span>
+                    <input
+                      type="number"
+                      value={ing.price ?? ""}
+                      onChange={(e) => updateIngredientRow(i, { price: e.target.value })}
+                      placeholder="1.50"
+                      className="w-full rounded-lg py-2.5 pl-6 pr-3 text-[13px] outline-none transition-all"
+                      style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
+                      onFocus={(e) => (e.target.style.borderColor = M.gold)}
+                      onBlur={(e)  => (e.target.style.borderColor = M.border)}
+                    />
                   </div>
                   <button
                     type="button"
@@ -390,7 +460,7 @@ export default function NewDishPage() {
               className="mt-3 flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12px] font-semibold transition-colors"
               style={{ border: `1px solid ${M.border}`, color: M.textMuted, background: M.surface }}
             >
-              <Plus size={12} /> Add Ingredient
+              <Plus size={12} /> Add Addon
             </button>
           </SectionCard>
 
@@ -494,100 +564,35 @@ export default function NewDishPage() {
               })}
             </div>
           </SectionCard>
-        </div>
+      </div>
 
-        {/* ── Side column ── */}
-        <div className="space-y-5 lg:sticky lg:top-6 lg:self-start">
-          {/* ── Preview card ── */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            className="overflow-hidden rounded-xl"
-            style={{ background: M.panel, border: `1px solid ${M.border}` }}
-          >
-            <div className="flex h-40 items-center justify-center" style={{ background: M.surface, borderBottom: `1px solid ${M.border}` }}>
-              {cover ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={cover} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center gap-1.5">
-                  <ImageOff size={22} style={{ color: M.textFaint }} />
-                  <span className="text-[11px]" style={{ color: M.textFaint }}>No image yet</span>
-                </div>
-              )}
-            </div>
-            <div className="p-4">
-              <p className="text-[15px] font-bold" style={{ color: form.name ? M.white : M.textMuted }}>
-                {form.name || "Dish name…"}
-              </p>
-              <div className="mt-1 flex items-center gap-2 flex-wrap">
-                {form.price && <span className="text-[13px] font-semibold" style={{ color: M.gold }}>£{form.price}</span>}
-                {form.kcal && <span className="text-[12px]" style={{ color: M.textMuted }}>{form.kcal} kcal</span>}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {form.tags.map((t) => (
-                  <span key={t} className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={TAG_COLORS[t] ?? { background: M.surface, color: M.textMuted }}>
-                    {t}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {form.available && (
-                  <span className="rounded-md px-2 py-1 text-[10px] font-bold" style={{ border: `1px solid ${M.green}`, color: M.green }}>Live</span>
-                )}
-                {form.popular && (
-                  <span className="rounded-md px-2 py-1 text-[10px] font-bold" style={{ border: `1px solid ${M.gold}`, color: M.gold }}>Popular</span>
-                )}
-                {form.vegan && (
-                  <span className="rounded-md px-2 py-1 text-[10px] font-bold" style={{ border: `1px solid ${M.green}`, color: M.green }}>Vegan</span>
-                )}
-              </div>
-            </div>
-          </motion.div>
-
-          {/* ── Settings ── */}
-          <SectionCard label="Settings">
-            <div className="space-y-3">
-              {[
-                { key: "available" as const, label: "Available",    desc: "Show on customer menu" },
-                { key: "popular"   as const, label: "Popular badge", desc: "Highlight as a popular dish" },
-                { key: "vegan"     as const, label: "Vegan",         desc: "Mark as a vegan dish" },
-              ].map(({ key, label, desc }) => (
-                <div key={key} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: M.surface, border: `1px solid ${M.border}` }}>
-                  <div>
-                    <p className="text-[13px] font-semibold" style={{ color: M.white }}>{label}</p>
-                    <p className="text-[11px]" style={{ color: M.textMuted }}>{desc}</p>
-                  </div>
-                  <SKToggle on={form[key]} onChange={() => set(key, !form[key])} />
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          {/* ── Footer actions ── */}
-          <div className="flex gap-3 pb-8">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex-1 rounded-lg py-3.5 text-[13px] font-semibold transition-colors"
-              style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; (e.currentTarget as HTMLElement).style.color = M.gold; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.border; (e.currentTarget as HTMLElement).style.color = M.textMuted; }}
-            >
-              Cancel
-            </button>
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleSave}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg py-3.5 text-[13px] font-bold"
-              style={{ background: M.gold, color: "#000000" }}
-            >
-              <Plus size={15} />
-              Add Dish
-            </motion.button>
-          </div>
-        </div>
+      {/* ── Footer actions ── */}
+      <div
+        className="sticky bottom-0 z-10 -mx-5 flex gap-3 border-t px-5 py-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8"
+        style={{ borderColor: M.border, background: "rgba(10,10,10,0.92)", backdropFilter: "blur(10px)" }}
+      >
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="flex-1 rounded-lg py-3.5 text-[13px] font-semibold transition-colors"
+          style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.border; (e.currentTarget as HTMLElement).style.color = M.textMuted; }}
+        >
+          Cancel
+        </button>
+        <motion.button
+          type="button"
+          whileHover={{ scale: saving ? 1 : 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleSave}
+          disabled={saving}
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg py-3.5 text-[13px] font-bold disabled:opacity-60"
+          style={{ background: M.gold, color: "#000000" }}
+        >
+          <Plus size={15} />
+          {saving ? "Saving…" : "Save"}
+        </motion.button>
       </div>
     </div>
   );

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail, ArrowRight } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
 import { SkLogoFull } from "@/components/ui/sk-logo";
+import { login } from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/client";
 
 /* ── Login-page palette (mentor project reference) ── */
 const M = {
@@ -122,8 +124,8 @@ const fadeUp: Variants = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("admin@subtlekitchen.com");
+  const [password, setPassword] = useState("Subtle@123");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -136,8 +138,13 @@ export default function LoginPage() {
     }
     setError("");
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    router.push("/dashboard");
+    try {
+      await login(email, password);
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (

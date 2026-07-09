@@ -6,7 +6,8 @@ import { Search, Download, ChevronLeft, ChevronRight, Eye, X, ClipboardList, Che
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { getOrders, STATUS_CFG, type Order, type OrderStatus, type OrderType } from "@/lib/orders-store";
-import { getCompanies } from "@/lib/companies-store";
+import { getCompanies, type Company } from "@/lib/companies-store";
+import { ApiError } from "@/lib/api/client";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -118,11 +119,13 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [typeFilter, setTypeFilter]     = useState("All Types");
   const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES);
-  const [companies, setCompanies]     = useState(() => getCompanies());
+  const [companies, setCompanies]     = useState<Company[]>([]);
 
   useEffect(() => {
     setOrders(getOrders());
-    setCompanies(getCompanies());
+    getCompanies()
+      .then(setCompanies)
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to load companies"));
   }, []);
 
   const companyOptions = [ALL_COMPANIES, INDIVIDUAL, ...companies.map((c) => c.name)];
@@ -270,7 +273,7 @@ export default function OrdersPage() {
           </p>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-hidden">
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ background: M.surface }}>
