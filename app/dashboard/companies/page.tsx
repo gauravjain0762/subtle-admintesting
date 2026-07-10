@@ -130,7 +130,7 @@ export default function CompaniesPage() {
 
   const handleDeleteIconClick = () => {
     if (!selectMode) { setSelectMode(true); return; }
-    if (selectedIds.size === 0) { toast.error("Select at least one company first"); return; }
+    if (selectedIds.size === 0) { exitSelectMode(); return; }
     setBulkConfirm(true);
   };
 

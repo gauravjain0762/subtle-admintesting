@@ -155,6 +155,31 @@ function FilterSelect({ value, options, onChange, minWidth }: {
   );
 }
 
+/** Native <input type="date"> renders its placeholder/value in the browser's own locale format (often dd-mm-yyyy),
+ *  which HTML's `lang` attribute cannot override. This shows our own MM/DD/YYYY text while a fully-transparent
+ *  native date input spans the whole box, so clicking anywhere (not just the calendar icon) opens the real picker. */
+function DateField({ value, onChange, min }: { value: string; onChange: (v: string) => void; min?: string }) {
+  const display = value ? (() => { const [y, m, d] = value.split("-"); return `${m}/${d}/${y}`; })() : null;
+  return (
+    <div
+      className="relative flex-none rounded-lg"
+      style={{ border: `1px solid ${M.border}`, background: M.panel }}
+    >
+      <div className="px-3.5 py-2 text-[12px] font-medium" style={{ color: display ? M.white : M.textFaint }}>
+        {display ?? "MM/DD/YYYY"}
+      </div>
+      <input
+        type="date"
+        min={min}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+    </div>
+  );
+}
+
 function itemsLabel(order: Order): string {
   if (order.items.length === 0) return "—";
   if (order.items.length === 1) {
@@ -176,13 +201,15 @@ export default function OrdersPage() {
   const [typeFilter, setTypeFilter]     = useState("All Types");
   const [companyFilter, setCompanyFilter] = useState(ALL_COMPANIES);
   const [dayFilter, setDayFilter]     = useState("All Time");
-  const [customDate, setCustomDate]   = useState("");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate]     = useState("");
   const [companies, setCompanies]     = useState<Company[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectMode, setSelectMode]   = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [todayStats, setTodayStats]   = useState({ total: 0, new: 0, delivered: 0 });
   const [refreshKey, setRefreshKey]   = useState(0);
+  const [exporting, setExporting]     = useState(false);
 
   useEffect(() => {
     getCompanies()
@@ -197,7 +224,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, statusFilter, typeFilter, companyFilter, dayFilter, customDate]);
+  }, [debouncedSearch, statusFilter, typeFilter, companyFilter, dayFilter, customStartDate, customEndDate]);
 
   const refreshTodayStats = () => {
     getAllOrders({ dayFilter: "today" })
@@ -221,14 +248,14 @@ export default function OrdersPage() {
       type: typeFilter === "All Types" ? undefined : (typeFilter.toLowerCase() as OrderType),
       workspaceId: companyId,
       dayFilter: DAY_FILTER_PARAM[dayFilter],
-      startDate: dayFilter === "Custom Date" ? customDate : undefined,
-      endDate: dayFilter === "Custom Date" ? customDate : undefined,
+      startDate: dayFilter === "Custom Date" ? customStartDate : undefined,
+      endDate: dayFilter === "Custom Date" ? (customEndDate || customStartDate) : undefined,
       search: debouncedSearch || undefined,
     })
       .then((res) => { setOrders(res.orders); setTotal(res.total); setTotalPages(res.totalPages); })
       .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to load orders"))
       .finally(() => setLoading(false));
-  }, [currentPage, statusFilter, typeFilter, companyFilter, dayFilter, customDate, debouncedSearch, companies, refreshKey]);
+  }, [currentPage, statusFilter, typeFilter, companyFilter, dayFilter, customStartDate, customEndDate, debouncedSearch, companies, refreshKey]);
 
   const companyOptions = [ALL_COMPANIES, ...companies.map((c) => c.name)];
 
@@ -242,7 +269,7 @@ export default function OrdersPage() {
 
   const handleMarkClick = (status: "delivered" | "cancelled") => {
     if (!selectMode) { setSelectMode(true); return; }
-    if (selectedIds.size === 0) { toast.error("Select at least one order first"); return; }
+    if (selectedIds.size === 0) { exitSelectMode(); return; }
     const ids = [...selectedIds];
     bulkUpdateStatus(ids, status)
       .then((updatedCount) => {
@@ -257,6 +284,50 @@ export default function OrdersPage() {
   const exitSelectMode = () => {
     setSelectMode(false);
     setSelectedIds(new Set());
+  };
+
+  const escapeCsv = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const companyId = companyFilter === ALL_COMPANIES ? undefined : companies.find((c) => c.name === companyFilter)?.id;
+      const list = await getAllOrders({
+        status: statusFilter === "All" ? undefined : (statusFilter.toLowerCase() as OrderStatus),
+        type: typeFilter === "All Types" ? undefined : (typeFilter.toLowerCase() as OrderType),
+        workspaceId: companyId,
+        dayFilter: DAY_FILTER_PARAM[dayFilter],
+        startDate: dayFilter === "Custom Date" ? customStartDate : undefined,
+        endDate: dayFilter === "Custom Date" ? (customEndDate || customStartDate) : undefined,
+        search: debouncedSearch || undefined,
+      });
+      const header = ["Order ID", "Customer", "Company", "Dish(es)", "Type", "Amount", "Status", "Date"];
+      const rows = list.map((o) => [
+        o.orderNumber,
+        o.customerName,
+        o.companyName ?? "Individual",
+        itemsLabel(o),
+        o.type,
+        o.totalAmount,
+        STATUS_CFG[o.status]?.label ?? o.status,
+        o.deliveryDateDisplay,
+      ]);
+      const csv = [header, ...rows].map((r) => r.map((v) => escapeCsv(String(v))).join(",")).join("\r\n");
+      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${list.length} order${list.length !== 1 ? "s" : ""} as CSV`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to export orders");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const stats = [
@@ -282,13 +353,14 @@ export default function OrdersPage() {
           <p className="mt-0.5 text-[12px]" style={{ color: "#D0C5AF" }}>{total} total orders across all companies and customers</p>
         </div>
         <motion.button
-          whileHover={{ scale: 1.03 }}
+          whileHover={{ scale: exporting ? 1 : 1.03 }}
           whileTap={{ scale: 0.97 }}
-          onClick={() => toast.success("Exporting orders as CSV…")}
-          className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-[12px] font-semibold"
+          onClick={handleExportCsv}
+          disabled={exporting}
+          className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-[12px] font-semibold disabled:opacity-60"
           style={{ background: M.gold, color: "#000000" }}
         >
-          <Download size={13} /> Export CSV
+          <Download size={13} /> {exporting ? "Exporting…" : "Export CSV"}
         </motion.button>
       </motion.div>
 
@@ -335,13 +407,11 @@ export default function OrdersPage() {
         <FilterSelect value={dayFilter} options={DAY_FILTERS} onChange={setDayFilter} minWidth={130} />
 
         {dayFilter === "Custom Date" && (
-          <input
-            type="date"
-            value={customDate}
-            onChange={(e) => setCustomDate(e.target.value)}
-            className="flex-none rounded-lg px-3.5 py-2 text-[12px] font-medium outline-none"
-            style={{ border: `1px solid ${M.border}`, background: M.panel, color: M.white }}
-          />
+          <>
+            <DateField value={customStartDate} onChange={setCustomStartDate} />
+            <span className="text-[12px]" style={{ color: M.textFaint }}>to</span>
+            <DateField value={customEndDate} onChange={setCustomEndDate} min={customStartDate || undefined} />
+          </>
         )}
       </motion.div>
 

@@ -215,7 +215,7 @@ export default function MenuPage() {
 
   const handleDeleteIconClick = () => {
     if (!selectMode) { setSelectMode(true); return; }
-    if (selectedIds.size === 0) { toast.error("Select at least one dish first"); return; }
+    if (selectedIds.size === 0) { exitSelectMode(); return; }
     setBulkConfirm(true);
   };
 

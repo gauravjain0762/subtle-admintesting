@@ -678,7 +678,6 @@ export default function NewDishPage() {
           className="flex flex-1 items-center justify-center gap-2 rounded-lg py-3.5 text-[13px] font-bold disabled:opacity-60"
           style={{ background: M.gold, color: "#000000" }}
         >
-          <Plus size={15} />
           {saving ? "Creating…" : "Create Dish"}
         </motion.button>
       </div>

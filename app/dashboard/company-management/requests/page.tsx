@@ -173,7 +173,7 @@ export default function CompanyRequestsPage() {
 
   const handleDeleteIconClick = () => {
     if (!selectMode) { setSelectMode(true); return; }
-    if (selectedIds.size === 0) { toast.error("Select at least one request first"); return; }
+    if (selectedIds.size === 0) { exitSelectMode(); return; }
     setBulkConfirm(true);
   };
 
