@@ -12,3 +12,7 @@ export async function updateWorkspace(id: string, patch: { status?: string }): P
     body: patch,
   });
 }
+
+export async function deleteWorkspace(id: string): Promise<void> {
+  await apiFetch(`/api/admin/workspaces/${id}`, { method: "DELETE" });
+}

@@ -1,4 +1,4 @@
-import { fetchWorkspaceRequests, approveWorkspaceRequest, rejectWorkspaceRequest } from "@/lib/api/workspace-requests";
+import { fetchWorkspaceRequests, approveWorkspaceRequest, rejectWorkspaceRequest, deleteWorkspaceRequest } from "@/lib/api/workspace-requests";
 import type { ApiWorkspaceRequest } from "@/lib/api/types";
 
 export type EnquiryStatus = "new" | "approved" | "rejected";
@@ -85,4 +85,8 @@ export async function approveEnquiry(id: string, code: string): Promise<void> {
 /** Rejects the workspace request with a reason (required by the backend). */
 export async function rejectEnquiry(id: string, reason: string): Promise<void> {
   await rejectWorkspaceRequest(id, reason);
+}
+
+export async function deleteEnquiry(id: string): Promise<void> {
+  await deleteWorkspaceRequest(id);
 }

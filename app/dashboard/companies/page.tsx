@@ -10,7 +10,7 @@ import {
   BadgeCheck, XCircle, X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getCompanies, setCompanyStatus, type Company } from "@/lib/companies-store";
+import { getCompanies, setCompanyStatus, deleteCompany, type Company } from "@/lib/companies-store";
 import { ApiError } from "@/lib/api/client";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { BulkDeleteDialog } from "@/components/ui/bulk-delete-dialog";
@@ -137,9 +137,13 @@ export default function CompaniesPage() {
   const handleBulkDelete = async () => {
     setBulkDeleting(true);
     try {
-      // No DELETE endpoint exists for workspaces yet — surface that clearly rather than pretending it worked.
-      await new Promise((r) => setTimeout(r, 300));
-      toast.error("Deleting companies isn't supported by the backend yet");
+      const ids = [...selectedIds];
+      await Promise.all(ids.map((id) => deleteCompany(id)));
+      toast.success(`${ids.length} compan${ids.length > 1 ? "ies" : "y"} deleted`);
+      exitSelectMode();
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to delete some companies");
     } finally {
       setBulkDeleting(false);
       setBulkConfirm(false);

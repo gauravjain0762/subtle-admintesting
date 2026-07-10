@@ -68,6 +68,8 @@ export default function NewDishPage() {
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [newAllergen, setNewAllergen] = useState("");
+  const [newTag, setNewTag] = useState("");
 
   useEffect(() => {
     const allMenus = getMenus();
@@ -112,6 +114,13 @@ export default function NewDishPage() {
       tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag],
     }));
 
+  const addCustomTag = () => {
+    const v = newTag.trim();
+    if (!v) return;
+    setForm((f) => f.tags.some((t) => t.toLowerCase() === v.toLowerCase()) ? f : { ...f, tags: [...f.tags, v] });
+    setNewTag("");
+  };
+
   const addNutritionRow = () =>
     setForm((f) => ({ ...f, nutrition: [...f.nutrition, { name: "", value: "" }] }));
 
@@ -141,6 +150,13 @@ export default function NewDishPage() {
       ...f,
       allergens: f.allergens.includes(a) ? f.allergens.filter((x) => x !== a) : [...f.allergens, a],
     }));
+
+  const addCustomAllergen = () => {
+    const v = newAllergen.trim();
+    if (!v) return;
+    setForm((f) => f.allergens.some((a) => a.toLowerCase() === v.toLowerCase()) ? f : { ...f, allergens: [...f.allergens, v] });
+    setNewAllergen("");
+  };
 
   const toggleAvailableDay = (day: string) =>
     setForm((f) => ({
@@ -393,7 +409,7 @@ export default function NewDishPage() {
             <div className="mt-4">
               <label className="mb-1.5 block text-[11.5px] font-semibold" style={{ color: M.textMuted }}>Allergens</label>
               <div className="flex flex-wrap gap-2">
-                {ALLERGENS.map((a) => {
+                {[...ALLERGENS, ...form.allergens.filter((a) => !ALLERGENS.includes(a))].map((a) => {
                   const active = form.allergens.includes(a);
                   return (
                     <motion.button
@@ -413,6 +429,29 @@ export default function NewDishPage() {
                     </motion.button>
                   );
                 })}
+              </div>
+              <div className="mt-2.5 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={newAllergen}
+                  onChange={(e) => setNewAllergen(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomAllergen(); } }}
+                  placeholder="Add custom…"
+                  className="w-36 rounded-full px-3.5 py-1.5 text-[12px] outline-none transition-all"
+                  style={{ border: `1px dashed ${M.border}`, background: "transparent", color: M.white }}
+                  onFocus={(e) => (e.target.style.borderColor = M.gold)}
+                  onBlur={(e)  => (e.target.style.borderColor = M.border)}
+                />
+                <button
+                  type="button"
+                  onClick={addCustomAllergen}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors"
+                  style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.gold; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.border; (e.currentTarget as HTMLElement).style.color = M.textMuted; }}
+                >
+                  <Plus size={13} />
+                </button>
               </div>
             </div>
           </SectionCard>
@@ -542,7 +581,7 @@ export default function NewDishPage() {
           {/* ── Tags ── */}
           <SectionCard label="Tags">
             <div className="flex flex-wrap gap-2">
-              {AVAILABLE_TAGS.map((tag) => {
+              {[...AVAILABLE_TAGS, ...form.tags.filter((t) => !AVAILABLE_TAGS.includes(t))].map((tag) => {
                 const active = form.tags.includes(tag);
                 return (
                   <motion.button
@@ -563,6 +602,29 @@ export default function NewDishPage() {
                 );
               })}
             </div>
+            <div className="mt-2.5 flex items-center gap-1.5">
+              <input
+                type="text"
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomTag(); } }}
+                placeholder="Add custom…"
+                className="w-36 rounded-full px-3.5 py-1.5 text-[12px] outline-none transition-all"
+                style={{ border: `1px dashed ${M.border}`, background: "transparent", color: M.white }}
+                onFocus={(e) => (e.target.style.borderColor = M.gold)}
+                onBlur={(e)  => (e.target.style.borderColor = M.border)}
+              />
+              <button
+                type="button"
+                onClick={addCustomTag}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors"
+                style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.gold; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.border; (e.currentTarget as HTMLElement).style.color = M.textMuted; }}
+              >
+                <Plus size={13} />
+              </button>
+            </div>
           </SectionCard>
 
           {/* ── Availability ── */}
@@ -576,13 +638,14 @@ export default function NewDishPage() {
                     type="button"
                     whileTap={{ scale: 0.92 }}
                     onClick={() => toggleAvailableDay(day)}
-                    className="flex-1 rounded-lg py-2.5 text-[12px] font-bold"
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg py-2.5 text-[12px] font-bold"
                     style={{
                       background: active ? M.gold  : M.surface,
                       color:      active ? "#000000"  : M.textMuted,
                       border:     `1px solid ${active ? M.gold : M.border}`,
                     }}
                   >
+                    {active && <Check size={12} />}
                     {day}
                   </motion.button>
                 );

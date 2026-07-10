@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, Eye, Check, MoreVertical, Trash2, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
-  getEnquiries, approveEnquiry, rejectEnquiry,
+  getEnquiries, approveEnquiry, rejectEnquiry, deleteEnquiry,
   type Enquiry, type EnquiryStatus,
 } from "@/lib/enquiries-store";
 import { LOGO_COLORS, generateCode } from "@/lib/companies-store";
@@ -109,6 +109,7 @@ export default function CompanyRequestsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | EnquiryStatus>("new");
 
   const refresh = () => {
     setLoading(true);
@@ -121,10 +122,12 @@ export default function CompanyRequestsPage() {
 
   const filtered = enquiries.filter((e) => {
     const q = search.toLowerCase();
-    return !q ||
+    const matchSearch = !q ||
       e.workspaceName.toLowerCase().includes(q) ||
       e.email.toLowerCase().includes(q) ||
       e.businessType.toLowerCase().includes(q);
+    const matchStatus = statusFilter === "all" || e.status === statusFilter;
+    return matchSearch && matchStatus;
   });
 
   const handleApprove = async (e: Enquiry) => {
@@ -177,9 +180,13 @@ export default function CompanyRequestsPage() {
   const handleBulkDelete = async () => {
     setBulkDeleting(true);
     try {
-      // No DELETE endpoint exists for workspace-requests yet — surface that clearly rather than pretending it worked.
-      await new Promise((r) => setTimeout(r, 300));
-      toast.error("Deleting requests isn't supported by the backend yet");
+      const ids = [...selectedIds];
+      await Promise.all(ids.map((id) => deleteEnquiry(id)));
+      toast.success(`${ids.length} request${ids.length > 1 ? "s" : ""} deleted`);
+      exitSelectMode();
+      refresh();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to delete some requests");
     } finally {
       setBulkDeleting(false);
       setBulkConfirm(false);
@@ -196,6 +203,24 @@ export default function CompanyRequestsPage() {
         <p className="mt-1 text-[12px]" style={{ color: "#D0C5AF" }}>
           New workspace sign-up requests awaiting review.
         </p>
+      </div>
+
+      {/* Status filter */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {(["all", "new", "approved", "rejected"] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            className="whitespace-nowrap rounded-lg px-3.5 py-2 text-[11.5px] font-semibold transition-all"
+            style={{
+              background: statusFilter === s ? M.gold : M.panel,
+              color: statusFilter === s ? "#000000" : M.textMuted,
+              border: `1px solid ${statusFilter === s ? M.gold : M.border}`,
+            }}
+          >
+            {s === "all" ? "All" : STATUS_CFG[s].label}
+          </button>
+        ))}
       </div>
 
       {/* Search */}

@@ -1,4 +1,4 @@
-import { fetchWorkspaces, updateWorkspace } from "@/lib/api/workspaces";
+import { fetchWorkspaces, updateWorkspace, deleteWorkspace } from "@/lib/api/workspaces";
 import type { ApiWorkspace } from "@/lib/api/types";
 
 export interface Company {
@@ -108,6 +108,10 @@ export async function getCompany(id: string): Promise<Company | undefined> {
 
 export async function setCompanyStatus(id: string, status: Company["status"]): Promise<void> {
   await updateWorkspace(id, { status });
+}
+
+export async function deleteCompany(id: string): Promise<void> {
+  await deleteWorkspace(id);
 }
 
 /** Generates a company code client-side — the admin supplies this when approving a workspace request. */

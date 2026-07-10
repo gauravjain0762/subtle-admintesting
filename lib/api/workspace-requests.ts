@@ -19,3 +19,7 @@ export async function rejectWorkspaceRequest(id: string, reason: string): Promis
     body: { reason },
   });
 }
+
+export async function deleteWorkspaceRequest(id: string): Promise<void> {
+  await apiFetch(`/api/admin/workspace-requests/${id}`, { method: "DELETE" });
+}
