@@ -1,2 +1,2 @@
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://subtle-backend-production.up.railway.app";
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://plain-frog-28dcsubtle.gauravjain0762.workers.dev";
