@@ -46,7 +46,7 @@ function initialsOf(name: string): string {
 }
 
 /** Deterministic so the same workspace always gets the same avatar color. */
-function colorFor(id: string) {
+export function colorFor(id: string) {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return LOGO_COLORS[hash % LOGO_COLORS.length];

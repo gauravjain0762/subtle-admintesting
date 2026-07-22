@@ -9,6 +9,7 @@ export interface OrderQuery {
   status?: ApiOrderStatus;
   type?: "weekly" | "one-off";
   workspaceId?: string;
+  customerId?: string;
   dayFilter?: "today" | "yesterday" | "last7days" | "custom";
   startDate?: string;
   endDate?: string;

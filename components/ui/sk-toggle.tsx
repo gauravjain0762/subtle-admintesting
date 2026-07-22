@@ -8,6 +8,9 @@ interface SKToggleProps {
   onChange: () => void;
   stopPropagation?: boolean;
   size?: "sm" | "md";
+  /** Override the "on" pill/border color — defaults to the SK brand yellow. */
+  color?: string;
+  borderColor?: string;
 }
 
 /**
@@ -22,6 +25,8 @@ export function SKToggle({
   onChange,
   stopPropagation = false,
   size = "md",
+  color = C.yellow,
+  borderColor = "#d4b800",
 }: SKToggleProps) {
   const W = size === "sm" ? 36 : 44;   // pill width
   const H = size === "sm" ? 22 : 26;   // pill height
@@ -49,8 +54,8 @@ export function SKToggle({
         width:    W,
         height:   H,
         overflow: "hidden",            // <-- clips knob to rounded pill
-        background:  on ? C.yellow    : "#c8c0b4",
-        border:      `${BORDER}px solid ${on ? "#d4b800" : "#b0a89c"}`,
+        background:  on ? color       : "#c8c0b4",
+        border:      `${BORDER}px solid ${on ? borderColor : "#b0a89c"}`,
         transition:  "background 0.22s ease, border-color 0.22s ease",
         flexShrink:  0,
       }}

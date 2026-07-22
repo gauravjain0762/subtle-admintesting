@@ -95,6 +95,7 @@ export interface OrderFilters {
   status?: OrderStatus;
   type?: OrderType;
   workspaceId?: string;
+  customerId?: string;
   dayFilter?: "today" | "yesterday" | "last7days" | "custom";
   startDate?: string;
   endDate?: string;

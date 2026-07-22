@@ -209,3 +209,62 @@ export interface ApiBulkOrderStatusResponse {
   success: boolean;
   updatedCount: number;
 }
+
+export type ApiPromoCodeType = "percentage" | "fixed";
+
+export interface ApiPromoCode {
+  _id: string;
+  code: string;
+  type: ApiPromoCodeType;
+  value: number;
+  label: string;
+  description?: string;
+  active: boolean;
+  expiresAt?: string;
+  workspaceCodes: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ApiPromoCodeListResponse {
+  success: boolean;
+  promoCodes: ApiPromoCode[];
+}
+
+export interface ApiPromoCodeResponse {
+  success: boolean;
+  promoCode: ApiPromoCode;
+}
+
+export type ApiCustomerType = "weekly" | "one-off";
+export type ApiCustomerSubscriptionStatus = "active" | "paused" | "cancelled" | string;
+export type ApiCustomerStatus = "active" | "blocked";
+
+export interface ApiCustomer {
+  _id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  workspaceId?: string;
+  workspaceCode?: string;
+  workspaceName?: string;
+  type: ApiCustomerType;
+  subscriptionStatus: ApiCustomerSubscriptionStatus;
+  status: ApiCustomerStatus;
+  orderCount: number;
+  createdAt: string;
+}
+
+export interface ApiCustomerListResponse {
+  success: boolean;
+  customers: ApiCustomer[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface ApiCustomerResponse {
+  success: boolean;
+  customer: ApiCustomer;
+}
+
