@@ -33,6 +33,7 @@ function Field({
   );
 }
 
+
 /* ── Section card ────────────────────────────────────────────────────── */
 function Section({
   title, icon: Icon, iconColor, iconBg, children, delay = 0,
