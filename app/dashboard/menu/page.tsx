@@ -7,11 +7,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   UtensilsCrossed, CircleCheck,
   Search, Eye, Edit2, Trash2, MoreVertical,
-  BadgeCheck, XCircle, X,
+  BadgeCheck, XCircle, X, Users, Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getDishes, toggleDishAvailable, deleteDish, type Dish } from "@/lib/menu-store";
 import { getMenus, type Menu } from "@/lib/menus-store";
+import { fetchCompanies, assignDishToCompanies, getAssignedCompanies } from "@/lib/api/companies";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { BulkDeleteDialog } from "@/components/ui/bulk-delete-dialog";
 import { ApiError } from "@/lib/api/client";
@@ -76,6 +77,108 @@ function StatCard({ label, value, icon: Icon, accent }: {
           <Icon size={16} style={{ color: accent }} strokeWidth={1.8} />
         </div>
       </div>
+    </motion.div>
+  );
+}
+
+/* ── Assign Companies Dialog ────────────────────────────────────── */
+function AssignDialog({
+  dish,
+  companies,
+  selectedCompanies,
+  onToggleCompany,
+  onSave,
+  onCancel,
+  loading
+}: {
+  dish: Dish;
+  companies: Company[];
+  selectedCompanies: Set<string>;
+  onToggleCompany: (companyId: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      className={`fixed inset-0 z-[80] flex items-center justify-center p-4 ${montserrat.className}`}
+      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0, y: 12 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 420, damping: 30 }}
+        className="w-full max-w-[650px] rounded-xl p-7 max-h-[80vh] overflow-y-auto"
+        style={{ background: M.panel, border: `1px solid ${M.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: "#1a2a4a" }}>
+          <Users size={20} style={{ color: M.gold }} />
+        </div>
+        <h2 className="text-[16px] font-bold" style={{ color: M.white }}>Assign to Companies</h2>
+        <p className="mt-2 text-[13px]" style={{ color: M.textMuted }}>
+          Select companies that should have access to <span className="font-semibold" style={{ color: M.white }}>{dish.name}</span>
+        </p>
+
+        {/* Companies List */}
+        <div className="mt-5 space-y-2">
+          {companies.length === 0 ? (
+            <p className="py-6 text-center text-[13px]" style={{ color: M.textMuted }}>No companies available</p>
+          ) : (
+            companies.map((company) => (
+              <motion.div
+                key={company._id}
+                whileHover={{ scale: 1.01 }}
+                className="flex items-center gap-3 rounded-lg p-3.5 cursor-pointer transition-colors"
+                style={{ background: M.surface, border: `1px solid ${selectedCompanies.has(company._id) ? M.gold : M.border}` }}
+                onClick={() => onToggleCompany(company._id)}
+              >
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded" style={{ border: `1.5px solid ${selectedCompanies.has(company._id) ? M.gold : M.border}`, background: selectedCompanies.has(company._id) ? M.gold : "transparent" }}>
+                  {selectedCompanies.has(company._id) && <Check size={12} color="#000000" />}
+                </div>
+                <div className="flex-1">
+                  <p className="text-[13px] font-semibold" style={{ color: M.white }}>{company.name}</p>
+                  <div className="mt-1 flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px]" style={{ color: M.textMuted }}>Code: <span style={{ color: M.gold }}>{company.code}</span></span>
+                    <span className="text-[11px]" style={{ color: M.textFaint }}>•</span>
+                    <span className="text-[11px]" style={{ color: M.textMuted }}>{company.town}, {company.city}</span>
+                    <span className="text-[11px]" style={{ color: M.textFaint }}>•</span>
+                    <span className="text-[11px]" style={{ color: M.textMuted }}>{company.postcode}</span>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="mt-6 flex gap-3 border-t" style={{ borderColor: M.border, paddingTop: "1.5rem" }}>
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors disabled:opacity-50"
+            style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+            onMouseEnter={(e) => { if (!loading) { (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; (e.currentTarget as HTMLElement).style.color = M.gold; } }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.border; (e.currentTarget as HTMLElement).style.color = M.textMuted; }}
+          >
+            Cancel
+          </button>
+          <motion.button
+            whileHover={{ scale: loading ? 1 : 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onSave}
+            disabled={loading}
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-60 transition-colors"
+            style={{ background: M.gold, color: "#000000" }}
+          >
+            {loading ? "Saving..." : `Assign to ${selectedCompanies.size} Companies`}
+          </motion.button>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -145,6 +248,10 @@ export default function MenuPage() {
   const [selectedIds,  setSelectedIds]  = useState<Set<string>>(new Set());
   const [bulkConfirm,  setBulkConfirm]  = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<Dish | null>(null);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
+  const [assignLoading, setAssignLoading] = useState(false);
 
   const refresh = () => {
     setLoading(true);
@@ -157,6 +264,49 @@ export default function MenuPage() {
     refresh();
     setMenus(getMenus());
   }, []);
+
+  const handleAssignClick = async (dish: Dish) => {
+    setAssignTarget(dish);
+    setSelectedCompanies(new Set());
+    try {
+      const companiesData = await fetchCompanies();
+      setCompanies(companiesData);
+      // Fetch already assigned companies for this dish
+      const assigned = await getAssignedCompanies(dish.id);
+      setSelectedCompanies(new Set(assigned.map((c) => c._id)));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to load companies");
+      setAssignTarget(null);
+    }
+  };
+
+  const handleToggleCompany = (companyId: string) => {
+    setSelectedCompanies((prev) => {
+      const next = new Set(prev);
+      if (next.has(companyId)) next.delete(companyId);
+      else next.add(companyId);
+      return next;
+    });
+  };
+
+  const handleAssignSave = async () => {
+    if (!assignTarget || selectedCompanies.size === 0) {
+      toast.error("Please select at least one company");
+      return;
+    }
+    setAssignLoading(true);
+    try {
+      const companyIds = Array.from(selectedCompanies);
+      await assignDishToCompanies(assignTarget.id, companyIds);
+      toast.success(`"${assignTarget.name}" assigned to ${selectedCompanies.size} companies`);
+      setAssignTarget(null);
+      setSelectedCompanies(new Set());
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to assign companies");
+    } finally {
+      setAssignLoading(false);
+    }
+  };
 
   const menuTypeOf = (menuId: string): "standard" | "custom" =>
     menus.find((m) => m.id === menuId)?.isDefault ? "standard" : "custom";
@@ -471,23 +621,37 @@ export default function MenuPage() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <RowActionsMenu
-                          open={openMenuId === dish.id}
-                          onOpenChange={(v) => setOpenMenuId(v ? dish.id : null)}
-                          menuStyle={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
-                          trigger={
-                            <button
-                              onClick={() => setOpenMenuId((v) => (v === dish.id ? null : dish.id))}
-                              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
-                              style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
-                              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
-                              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = M.textMuted; (e.currentTarget as HTMLElement).style.borderColor = M.border; }}
-                              aria-label="Actions"
+                        <div className="flex items-center gap-2">
+                          {menuTypeOf(dish.menuId ?? "standard") === "custom" && (
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => { e.stopPropagation(); handleAssignClick(dish); }}
+                              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors"
+                              style={{ border: `1px solid ${M.gold}`, color: M.gold, background: "transparent" }}
+                              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.gold; (e.currentTarget as HTMLElement).style.color = "#000000"; }}
+                              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = M.gold; }}
                             >
-                              <MoreVertical size={14} />
-                            </button>
-                          }
-                        >
+                              <Users size={12} /> Assign
+                            </motion.button>
+                          )}
+                          <RowActionsMenu
+                            open={openMenuId === dish.id}
+                            onOpenChange={(v) => setOpenMenuId(v ? dish.id : null)}
+                            menuStyle={{ background: "#141414", border: `1px solid ${M.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}
+                            trigger={
+                              <button
+                                onClick={() => setOpenMenuId((v) => (v === dish.id ? null : dish.id))}
+                                className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                                style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+                                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
+                                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = M.textMuted; (e.currentTarget as HTMLElement).style.borderColor = M.border; }}
+                                aria-label="Actions"
+                              >
+                                <MoreVertical size={14} />
+                              </button>
+                            }
+                          >
                           <button
                             onClick={() => { setOpenMenuId(null); router.push(`/dashboard/menu/edit?id=${dish.id}`); }}
                             className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors"
@@ -532,7 +696,8 @@ export default function MenuPage() {
                           >
                             <Trash2 size={13} /> Delete
                           </button>
-                        </RowActionsMenu>
+                          </RowActionsMenu>
+                        </div>
                       </td>
                     </motion.tr>
                   );
@@ -558,6 +723,21 @@ export default function MenuPage() {
           </div>
         )}
       </motion.div>
+
+      {/* Assign Companies dialog */}
+      <AnimatePresence>
+        {assignTarget && (
+          <AssignDialog
+            dish={assignTarget}
+            companies={companies}
+            selectedCompanies={selectedCompanies}
+            onToggleCompany={handleToggleCompany}
+            onSave={handleAssignSave}
+            onCancel={() => setAssignTarget(null)}
+            loading={assignLoading}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Delete dialog */}
       <AnimatePresence>
