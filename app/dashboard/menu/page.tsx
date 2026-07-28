@@ -12,7 +12,7 @@ import {
 import { toast } from "sonner";
 import { getDishes, toggleDishAvailable, deleteDish, type Dish } from "@/lib/menu-store";
 import { getMenus, type Menu } from "@/lib/menus-store";
-import { fetchCompanies, assignDishToCompanies, getAssignedCompanies } from "@/lib/api/companies";
+import { fetchCompanies, assignDishToCompanies, getAssignedCompanies, type Company } from "@/lib/api/companies";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { BulkDeleteDialog } from "@/components/ui/bulk-delete-dialog";
 import { ApiError } from "@/lib/api/client";

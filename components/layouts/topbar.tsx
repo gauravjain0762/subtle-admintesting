@@ -136,7 +136,7 @@ export function Topbar({ onMobileMenuOpen, sidebarWidth = 264 }: TopbarProps) {
             >
               <span className="hidden sm:inline">{stripeMode.toUpperCase()}</span>
               <span className="sm:hidden">{stripeMode === "live" ? "🔴" : "🟡"}</span>
-              <ChevronDown size={14} style={{ transition: "transform 0.2s" }} style={{ transform: modeDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+              <ChevronDown size={14} style={{ transition: "transform 0.2s", transform: modeDropdownOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
             </button>
 
             {/* Dropdown Menu */}
