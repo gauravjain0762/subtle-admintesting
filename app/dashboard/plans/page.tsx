@@ -33,6 +33,7 @@ export default function PlansPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "weekly" | "one-off">("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<PlanType | null>(null);
 
   useEffect(() => {
     fetchPlans();
@@ -253,6 +254,7 @@ export default function PlansPage() {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
+                  onClick={() => setEditingPlan(plan)}
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-[11px] font-bold transition-all"
                   style={{
                     border: `1px solid ${M.border}`,
@@ -307,6 +309,16 @@ export default function PlansPage() {
             onClose={() => setShowCreateModal(false)}
             onSave={() => {
               setShowCreateModal(false);
+              fetchPlans();
+            }}
+          />
+        )}
+        {editingPlan && (
+          <EditPlanModal
+            plan={editingPlan}
+            onClose={() => setEditingPlan(null)}
+            onSave={() => {
+              setEditingPlan(null);
               fetchPlans();
             }}
           />
@@ -517,6 +529,198 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
             style={{ background: M.gold, color: "#000000" }}
           >
             {saving ? "Creating..." : "Create Plan"}
+          </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () => void; onSave: () => void }) {
+  const [name, setName] = useState(plan.name);
+  const [price, setPrice] = useState(plan.price.toString());
+  const [description, setDescription] = useState(plan.description || "");
+  const [selectedDays, setSelectedDays] = useState<string[]>(plan.deliveryDays || ["Mon", "Tue", "Wed", "Thu", "Fri"]);
+  const [saving, setSaving] = useState(false);
+
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+
+  const toggleDay = (day: string) => {
+    setSelectedDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  };
+
+  const handleSave = async () => {
+    if (!name.trim() || !price) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updatePlan(plan._id, {
+        type: plan.type,
+        name: name.trim(),
+        description: description.trim() || undefined,
+        price: parseFloat(price),
+        deliveryDays: plan.type === "weekly" ? selectedDays : undefined,
+        status: plan.status,
+      });
+      toast.success("Plan updated successfully");
+      onSave();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to update plan");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0, y: 12 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 420, damping: 30 }}
+        className="w-full max-w-[500px] rounded-xl p-7"
+        style={{ background: M.panel, border: `1px solid ${M.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-[18px] font-bold" style={{ color: M.white }}>
+          Edit Plan
+        </h2>
+        <p className="mt-1 text-[12px]" style={{ color: M.textMuted }}>
+          Update subscription plan details
+        </p>
+
+        <div className="mt-6 space-y-5">
+          {/* Plan Type (Read-only) */}
+          <div>
+            <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+              Plan Type
+            </label>
+            <div
+              className="w-full rounded-lg px-4 py-2.5 text-[13px]"
+              style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.textMuted }}
+            >
+              {plan.type === "weekly" ? "Weekly Plan" : "One-off Pattern"}
+            </div>
+          </div>
+
+          {/* Plan Name */}
+          <div>
+            <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+              Plan Name *
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg px-4 py-2.5 text-[13px] outline-none"
+              style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
+              onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
+              onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              className="w-full resize-none rounded-lg px-4 py-2.5 text-[13px] outline-none"
+              style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
+              onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
+              onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}
+            />
+          </div>
+
+          {/* Price */}
+          <div>
+            <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+              Price per Week (£) *
+            </label>
+            <input
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              step="0.01"
+              min="0"
+              className="w-full rounded-lg px-4 py-2.5 text-[13px] outline-none"
+              style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
+              onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
+              onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}
+            />
+          </div>
+
+          {/* Days Selection (Weekly only) */}
+          {plan.type === "weekly" && (
+            <div>
+              <label className="mb-3 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+                Delivery Days
+              </label>
+              <div className="flex gap-2">
+                {days.map((day) => (
+                  <motion.button
+                    key={day}
+                    whileTap={{ scale: 0.94 }}
+                    onClick={() => toggleDay(day)}
+                    className="flex-1 rounded-lg py-2 text-[12px] font-bold transition-colors"
+                    style={{
+                      background: selectedDays.includes(day) ? M.gold : M.surface,
+                      color: selectedDays.includes(day) ? "#000000" : M.textMuted,
+                      border: `1px solid ${selectedDays.includes(day) ? M.gold : M.border}`,
+                    }}
+                  >
+                    {day}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="mt-6 flex gap-3 border-t pt-4" style={{ borderColor: M.border }}>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors disabled:opacity-50"
+            style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+            onMouseEnter={(e) => {
+              if (!saving) {
+                (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint;
+                (e.currentTarget as HTMLElement).style.color = M.gold;
+              }
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.borderColor = M.border;
+              (e.currentTarget as HTMLElement).style.color = M.textMuted;
+            }}
+          >
+            Cancel
+          </button>
+          <motion.button
+            whileHover={{ scale: saving ? 1 : 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-60"
+            style={{ background: M.gold, color: "#000000" }}
+          >
+            {saving ? "Saving..." : "Save Changes"}
           </motion.button>
         </div>
       </motion.div>
