@@ -126,7 +126,7 @@ export default function PlansPage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="grid gap-4 md:grid-cols-2 lg:grid-cols-1"
+        className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
       >
         {loading ? (
           <p className="py-8 text-center text-[13px]" style={{ color: M.textMuted }}>
@@ -148,111 +148,151 @@ export default function PlansPage() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="overflow-hidden rounded-xl p-5"
-              style={{ background: M.panel, border: `1px solid ${M.border}` }}
+              className="group relative overflow-hidden rounded-2xl p-6 backdrop-blur-sm transition-all duration-300 hover:shadow-2xl"
+              style={{
+                background: `linear-gradient(135deg, ${M.panel} 0%, #0f0f0f 100%)`,
+                border: `1.5px solid ${M.border}`,
+              }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.borderColor = M.gold;
+                (e.currentTarget as HTMLElement).style.boxShadow = `0 0 40px rgba(248,227,150,0.15)`;
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLElement).style.borderColor = M.border;
+                (e.currentTarget as HTMLElement).style.boxShadow = "none";
               }}
             >
-              <div className="mb-4 flex items-start justify-between">
-                <div>
-                  <h3 className="text-[15px] font-bold" style={{ color: M.white }}>
+              {/* Gradient accent */}
+              <div
+                className="absolute top-0 left-0 w-1 h-16 opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ background: `linear-gradient(180deg, ${M.gold} 0%, transparent 100%)` }}
+              />
+
+              {/* Header */}
+              <div className="mb-5 flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-[16px] font-bold leading-tight" style={{ color: M.white }}>
                     {plan.name}
                   </h3>
-                  <p className="mt-1 text-[12px]" style={{ color: M.textMuted }}>
+                  <p className="mt-1.5 text-[11px] font-medium" style={{ color: M.textMuted }}>
                     {plan.type === "weekly" ? "Weekly Plan" : "One-off Pattern"}
                   </p>
                 </div>
-                <span
-                  className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold"
+                <motion.span
+                  whileHover={{ scale: 1.1 }}
+                  className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold backdrop-blur-sm"
                   style={{
                     border: `1px solid ${plan.status === "active" ? M.green : M.red}`,
                     color: plan.status === "active" ? M.green : M.red,
+                    background: plan.status === "active" ? "rgba(34,197,94,0.1)" : "rgba(255,107,107,0.1)",
                   }}
                 >
-                  {plan.status === "active" ? "Active" : "Inactive"}
-                </span>
+                  {plan.status === "active" ? "●" : "○"} {plan.status === "active" ? "Active" : "Inactive"}
+                </motion.span>
               </div>
 
-              <div className="mb-4 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-[12px]" style={{ color: M.textMuted }}>
-                    Price per week
-                  </span>
-                  <span className="text-[13px] font-bold" style={{ color: M.gold }}>
+              {/* Stats Grid */}
+              <div className="mb-5 grid grid-cols-2 gap-4 py-4 px-3 rounded-xl" style={{ background: M.surface }}>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: M.textFaint }}>
+                    Price/Week
+                  </p>
+                  <p className="mt-2 text-[18px] font-bold" style={{ color: M.gold }}>
                     £{plan.price.toFixed(2)}
-                  </span>
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-[12px]" style={{ color: M.textMuted }}>
-                    Active subscriptions
-                  </span>
-                  <span className="text-[13px] font-bold" style={{ color: M.white }}>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: M.textFaint }}>
+                    Subscriptions
+                  </p>
+                  <p className="mt-2 text-[18px] font-bold" style={{ color: M.white }}>
                     {plan.activeSubs}
-                  </span>
+                  </p>
                 </div>
-                {plan.type === "weekly" && plan.deliveryDays && (
-                  <div className="flex justify-between">
-                    <span className="text-[12px]" style={{ color: M.textMuted }}>
-                      Delivery days
-                    </span>
-                    <span className="text-[12px]" style={{ color: M.white }}>
-                      {plan.deliveryDays.join(", ")}
-                    </span>
-                  </div>
-                )}
-                {plan.type === "one-off" && plan.patterns && (
-                  <div>
-                    <span className="text-[12px]" style={{ color: M.textMuted }}>
-                      Patterns:
-                    </span>
-                    <div className="mt-1 space-y-1">
-                      {plan.patterns.map((p, idx) => (
-                        <div key={idx} className="text-[11px]" style={{ color: M.white }}>
-                          • {p.name}: {p.days.join(", ")}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
+
+              {/* Delivery Info */}
+              {plan.type === "weekly" && plan.deliveryDays && (
+                <div className="mb-5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: M.textFaint }}>
+                    Delivery Days
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {plan.deliveryDays.map((day) => (
+                      <span
+                        key={day}
+                        className="inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-bold"
+                        style={{ border: `1px solid ${M.goldFaint}`, color: M.gold, background: "rgba(248,227,150,0.08)" }}
+                      >
+                        {day}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {plan.type === "one-off" && plan.patterns && (
+                <div className="mb-5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: M.textFaint }}>
+                    Patterns
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {plan.patterns.map((p, idx) => (
+                      <div key={idx} className="text-[11px]" style={{ color: M.textMuted }}>
+                        <span style={{ color: M.gold }}>{p.name}</span>
+                        <span className="mx-2">•</span>
+                        <span>{p.days.join(", ")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
-              <div className="flex gap-2 pt-4">
+              <div className="flex gap-2 pt-2 border-t" style={{ borderColor: M.border }}>
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold transition-colors"
-                  style={{ border: `1px solid ${M.border}`, color: M.textMuted, background: "transparent" }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-[11px] font-bold transition-all"
+                  style={{
+                    border: `1px solid ${M.border}`,
+                    color: M.textMuted,
+                    background: "transparent",
+                  }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLElement).style.background = M.surface;
                     (e.currentTarget as HTMLElement).style.color = M.gold;
+                    (e.currentTarget as HTMLElement).style.borderColor = M.gold;
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background = "transparent";
                     (e.currentTarget as HTMLElement).style.color = M.textMuted;
+                    (e.currentTarget as HTMLElement).style.borderColor = M.border;
                   }}
                 >
-                  <Edit2 size={12} /> Edit
+                  <Edit2 size={13} /> Edit
                 </motion.button>
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold transition-colors"
-                  style={{ border: `1px solid ${M.border}`, color: M.textMuted, background: "transparent" }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-[11px] font-bold transition-all"
+                  style={{
+                    border: `1px solid ${M.border}`,
+                    color: M.textMuted,
+                    background: "transparent",
+                  }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLElement).style.background = M.surface;
                     (e.currentTarget as HTMLElement).style.color = M.gold;
+                    (e.currentTarget as HTMLElement).style.borderColor = M.gold;
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background = "transparent";
                     (e.currentTarget as HTMLElement).style.color = M.textMuted;
+                    (e.currentTarget as HTMLElement).style.borderColor = M.border;
                   }}
                 >
-                  <Eye size={12} /> Subscriptions
+                  <Eye size={13} /> Subs
                 </motion.button>
               </div>
             </motion.div>
