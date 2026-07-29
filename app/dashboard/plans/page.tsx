@@ -5,6 +5,8 @@ import { Montserrat } from "next/font/google";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Edit2, Trash2, MoreVertical, Eye, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { getPlans, createPlan, updatePlan, deletePlan, type Plan as PlanType, type DeliveryPattern } from "@/lib/api/plans";
+import { ApiError } from "@/lib/api/client";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -25,21 +27,9 @@ const M = {
   red: "#ff6b6b",
 };
 
-interface Plan {
-  _id: string;
-  name: string;
-  type: "weekly" | "one-off";
-  price: number;
-  description?: string;
-  deliveryDays?: string[];
-  patterns?: Array<{ name: string; days: string[] }>;
-  activeSubscriptions: number;
-  status: "active" | "inactive";
-  createdAt: string;
-}
 
 export default function PlansPage() {
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plans, setPlans] = useState<PlanType[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "weekly" | "one-off">("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -51,12 +41,10 @@ export default function PlansPage() {
   const fetchPlans = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const res = await getPlans();
-      // setPlans(res);
-      toast.error("API not yet integrated");
+      const res = await getPlans();
+      setPlans(res);
     } catch (err) {
-      toast.error("Failed to load plans");
+      toast.error(err instanceof ApiError ? err.message : "Failed to load plans");
     } finally {
       setLoading(false);
     }
@@ -203,7 +191,7 @@ export default function PlansPage() {
                     Active subscriptions
                   </span>
                   <span className="text-[13px] font-bold" style={{ color: M.white }}>
-                    {plan.activeSubscriptions}
+                    {plan.activeSubs}
                   </span>
                 </div>
                 {plan.type === "weekly" && plan.deliveryDays && (
@@ -275,7 +263,13 @@ export default function PlansPage() {
       {/* Create/Edit Modal */}
       <AnimatePresence>
         {showCreateModal && (
-          <CreatePlanModal onClose={() => setShowCreateModal(false)} onSave={() => {}} />
+          <CreatePlanModal
+            onClose={() => setShowCreateModal(false)}
+            onSave={() => {
+              setShowCreateModal(false);
+              fetchPlans();
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
@@ -286,7 +280,9 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
   const [planType, setPlanType] = useState<"weekly" | "one-off">("weekly");
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [description, setDescription] = useState("");
   const [selectedDays, setSelectedDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
+  const [saving, setSaving] = useState(false);
 
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
@@ -294,6 +290,32 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
     setSelectedDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
     );
+  };
+
+  const handleCreate = async () => {
+    if (!name.trim() || !price) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await createPlan({
+        type: planType,
+        name: name.trim(),
+        description: description.trim() || undefined,
+        price: parseFloat(price),
+        deliveryDays: planType === "weekly" ? selectedDays : undefined,
+        patterns: planType === "one-off" ? [] : undefined,
+        status: "active",
+      });
+      toast.success("Plan created successfully");
+      onSave();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to create plan");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -349,7 +371,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
           {/* Plan Name */}
           <div>
             <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
-              Plan Name
+              Plan Name *
             </label>
             <input
               type="text"
@@ -363,10 +385,27 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
             />
           </div>
 
+          {/* Description */}
+          <div>
+            <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Mon-Fri delivery"
+              rows={2}
+              className="w-full resize-none rounded-lg px-4 py-2.5 text-[13px] outline-none"
+              style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
+              onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
+              onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}
+            />
+          </div>
+
           {/* Price */}
           <div>
             <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
-              Price per Week (£)
+              Price per Week (£) *
             </label>
             <input
               type="number"
@@ -374,6 +413,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
               onChange={(e) => setPrice(e.target.value)}
               placeholder="47.50"
               step="0.01"
+              min="0"
               className="w-full rounded-lg px-4 py-2.5 text-[13px] outline-none"
               style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
               onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
@@ -412,11 +452,14 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
         <div className="mt-6 flex gap-3 border-t pt-4" style={{ borderColor: M.border }}>
           <button
             onClick={onClose}
-            className="flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors"
+            disabled={saving}
+            className="flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors disabled:opacity-50"
             style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint;
-              (e.currentTarget as HTMLElement).style.color = M.gold;
+              if (!saving) {
+                (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint;
+                (e.currentTarget as HTMLElement).style.color = M.gold;
+              }
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLElement).style.borderColor = M.border;
@@ -426,17 +469,14 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
             Cancel
           </button>
           <motion.button
-            whileHover={{ scale: 1.02 }}
+            whileHover={{ scale: saving ? 1 : 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => {
-              // TODO: API call to create plan
-              toast.success("Plan created successfully");
-              onClose();
-            }}
-            className="flex-1 rounded-lg py-2.5 text-[13px] font-bold"
+            onClick={handleCreate}
+            disabled={saving}
+            className="flex-1 rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-60"
             style={{ background: M.gold, color: "#000000" }}
           >
-            Create Plan
+            {saving ? "Creating..." : "Create Plan"}
           </motion.button>
         </div>
       </motion.div>

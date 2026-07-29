@@ -1,19 +1,31 @@
 import { apiFetch } from "./client";
 
-export interface PlanPayload {
+export interface DeliveryPattern {
+  id: string;
   name: string;
-  type: "weekly" | "one-off";
-  price: number;
-  description?: string;
-  deliveryDays?: string[]; // For weekly plans
-  patterns?: Array<{ name: string; days: string[] }>; // For one-off plans
-  status?: "active" | "inactive";
+  days: string[];
 }
 
-export interface Plan extends PlanPayload {
-  _id: string;
-  activeSubscriptions: number;
+export interface PlanPayload {
+  type: "weekly" | "one-off";
+  name: string;
+  description?: string;
+  price: number;
+  deliveryDays?: string[];
+  patterns?: DeliveryPattern[];
   status: "active" | "inactive";
+}
+
+export interface Plan {
+  _id: string;
+  type: "weekly" | "one-off";
+  name: string;
+  description?: string;
+  price: number;
+  deliveryDays?: string[];
+  patterns?: DeliveryPattern[];
+  status: "active" | "inactive";
+  activeSubs: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,9 +38,14 @@ export interface PlansListResponse {
 export interface PlanResponse {
   success: boolean;
   plan: Plan;
+  activeSubs?: number;
 }
 
-// TODO: Replace with actual API endpoints
+export interface DeleteResponse {
+  success: boolean;
+  message: string;
+}
+
 export async function getPlans(): Promise<Plan[]> {
   const res = await apiFetch<PlansListResponse>("/api/admin/plans");
   return res.plans;
@@ -55,6 +72,9 @@ export async function updatePlan(planId: string, payload: Partial<PlanPayload>):
   return res.plan;
 }
 
-export async function deletePlan(planId: string): Promise<void> {
-  await apiFetch(`/api/admin/plans/${planId}`, { method: "DELETE" });
+export async function deletePlan(planId: string): Promise<DeleteResponse> {
+  const res = await apiFetch<DeleteResponse>(`/api/admin/plans/${planId}`, {
+    method: "DELETE",
+  });
+  return res;
 }
