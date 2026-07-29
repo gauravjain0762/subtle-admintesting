@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Montserrat } from "next/font/google";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Edit2, Trash2, MoreVertical, Eye, CheckCircle, XCircle } from "lucide-react";
@@ -302,28 +303,31 @@ export default function PlansPage() {
         )}
       </motion.div>
 
-      {/* Create/Edit Modal */}
-      <AnimatePresence>
-        {showCreateModal && (
-          <CreatePlanModal
-            onClose={() => setShowCreateModal(false)}
-            onSave={() => {
-              setShowCreateModal(false);
-              fetchPlans();
-            }}
-          />
-        )}
-        {editingPlan && (
-          <EditPlanModal
-            plan={editingPlan}
-            onClose={() => setEditingPlan(null)}
-            onSave={() => {
-              setEditingPlan(null);
-              fetchPlans();
-            }}
-          />
-        )}
-      </AnimatePresence>
+      {/* Create/Edit Modal — portaled to document.body to escape PageTransition stacking context */}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {showCreateModal && (
+            <CreatePlanModal
+              onClose={() => setShowCreateModal(false)}
+              onSave={() => {
+                setShowCreateModal(false);
+                fetchPlans();
+              }}
+            />
+          )}
+          {editingPlan && (
+            <EditPlanModal
+              plan={editingPlan}
+              onClose={() => setEditingPlan(null)}
+              onSave={() => {
+                setEditingPlan(null);
+                fetchPlans();
+              }}
+            />
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
@@ -412,7 +416,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 overflow-hidden"
       style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
@@ -421,18 +425,20 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0 }}
         transition={{ type: "spring", stiffness: 420, damping: 30 }}
-        className="w-full max-w-[500px] rounded-xl p-7"
+        className="w-full max-w-[380px] rounded-xl flex flex-col max-h-[90vh] overflow-hidden"
         style={{ background: M.panel, border: `1px solid ${M.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-[18px] font-bold" style={{ color: M.white }}>
-          Create New Plan
-        </h2>
-        <p className="mt-1 text-[12px]" style={{ color: M.textMuted }}>
-          Set up a new subscription plan for your customers
-        </p>
+        <div className="shrink-0 p-5 border-b" style={{ borderColor: M.border }}>
+          <h2 className="text-[18px] font-bold" style={{ color: M.white }}>
+            Create New Plan
+          </h2>
+          <p className="mt-1 text-[12px]" style={{ color: M.textMuted }}>
+            Set up a new subscription plan for your customers
+          </p>
+        </div>
 
-        <div className="mt-6 space-y-5">
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">
           {/* Plan Type */}
           <div>
             <label className="mb-3 block text-[11px] font-bold" style={{ color: M.textMuted }}>
@@ -459,7 +465,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
 
           {/* Plan Name */}
           <div>
-            <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+            <label className="mb-1 block text-[11px] font-bold" style={{ color: M.textMuted }}>
               Plan Name *
             </label>
             <input
@@ -467,7 +473,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Weekly Meal Plan"
-              className="w-full rounded-lg px-4 py-2.5 text-[13px] outline-none"
+              className="w-full rounded-lg px-4 py-1.5 text-[13px] outline-none"
               style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
               onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
               onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}
@@ -476,15 +482,15 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
 
           {/* Description */}
           <div>
-            <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+            <label className="mb-1 block text-[11px] font-bold" style={{ color: M.textMuted }}>
               Description
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. Mon-Fri delivery"
-              rows={2}
-              className="w-full resize-none rounded-lg px-4 py-2.5 text-[13px] outline-none"
+              rows={1}
+              className="w-full resize-none rounded-lg px-4 py-1.5 text-[13px] outline-none"
               style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
               onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
               onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}
@@ -493,7 +499,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
 
           {/* Price */}
           <div>
-            <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+            <label className="mb-1 block text-[11px] font-bold" style={{ color: M.textMuted }}>
               Price per Week (£) *
             </label>
             <input
@@ -503,7 +509,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
               placeholder="47.50"
               step="0.01"
               min="0"
-              className="w-full rounded-lg px-4 py-2.5 text-[13px] outline-none"
+              className="w-full rounded-lg px-4 py-1.5 text-[13px] outline-none"
               style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
               onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
               onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}
@@ -513,7 +519,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
           {/* Days Selection (Weekly only) */}
           {planType === "weekly" && (
             <div>
-              <label className="mb-3 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+              <label className="mb-2 block text-[11px] font-bold" style={{ color: M.textMuted }}>
                 Delivery Days
               </label>
               <div className="flex gap-2">
@@ -539,7 +545,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
           {/* Patterns (One-off only) */}
           {planType === "one-off" && (
             <div>
-              <label className="mb-3 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+              <label className="mb-2 block text-[11px] font-bold" style={{ color: M.textMuted }}>
                 Delivery Patterns *
               </label>
 
@@ -621,8 +627,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
           )}
         </div>
 
-        {/* Footer */}
-        <div className="mt-6 flex gap-3 border-t pt-4" style={{ borderColor: M.border }}>
+        <div className="flex gap-3 border-t p-6" style={{ borderColor: M.border }}>
           <button
             onClick={onClose}
             disabled={saving}
@@ -646,7 +651,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
             whileTap={{ scale: 0.98 }}
             onClick={handleCreate}
             disabled={saving}
-            className="flex-1 rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-60"
+            className="flex-1 rounded-lg py-2 text-[12px] font-bold disabled:opacity-60"
             style={{ background: M.gold, color: "#000000" }}
           >
             {saving ? "Creating..." : "Create Plan"}
@@ -702,7 +707,7 @@ function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 overflow-hidden"
       style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
@@ -711,18 +716,20 @@ function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () 
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0 }}
         transition={{ type: "spring", stiffness: 420, damping: 30 }}
-        className="w-full max-w-[500px] rounded-xl p-7"
+        className="w-full max-w-[380px] rounded-xl flex flex-col max-h-[90vh] overflow-hidden"
         style={{ background: M.panel, border: `1px solid ${M.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-[18px] font-bold" style={{ color: M.white }}>
-          Edit Plan
-        </h2>
-        <p className="mt-1 text-[12px]" style={{ color: M.textMuted }}>
-          Update subscription plan details
-        </p>
+        <div className="shrink-0 p-5 border-b" style={{ borderColor: M.border }}>
+          <h2 className="text-[18px] font-bold" style={{ color: M.white }}>
+            Edit Plan
+          </h2>
+          <p className="mt-1 text-[12px]" style={{ color: M.textMuted }}>
+            Update subscription plan details
+          </p>
+        </div>
 
-        <div className="mt-6 space-y-5">
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">
           {/* Plan Type (Read-only) */}
           <div>
             <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
@@ -789,7 +796,7 @@ function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () 
           {/* Days Selection (Weekly only) */}
           {plan.type === "weekly" && (
             <div>
-              <label className="mb-3 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+              <label className="mb-2 block text-[11px] font-bold" style={{ color: M.textMuted }}>
                 Delivery Days
               </label>
               <div className="flex gap-2">
@@ -813,12 +820,11 @@ function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () 
           )}
         </div>
 
-        {/* Footer */}
-        <div className="mt-6 flex gap-3 border-t pt-4" style={{ borderColor: M.border }}>
+        <div className="shrink-0 flex gap-3 border-t p-5" style={{ borderColor: M.border }}>
           <button
             onClick={onClose}
             disabled={saving}
-            className="flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors disabled:opacity-50"
+            className="flex-1 rounded-lg py-2 text-[12px] font-semibold transition-colors disabled:opacity-50"
             style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
             onMouseEnter={(e) => {
               if (!saving) {
@@ -838,7 +844,7 @@ function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () 
             whileTap={{ scale: 0.98 }}
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 rounded-lg py-2.5 text-[13px] font-bold disabled:opacity-60"
+            className="flex-1 rounded-lg py-2 text-[12px] font-bold disabled:opacity-60"
             style={{ background: M.gold, color: "#000000" }}
           >
             {saving ? "Saving..." : "Save Changes"}
