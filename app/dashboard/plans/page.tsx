@@ -334,6 +334,11 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [selectedDays, setSelectedDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
+  const [patterns, setPatterns] = useState<DeliveryPattern[]>([
+    { id: "p1", name: "Mon-Wed-Fri", days: ["Mon", "Wed", "Fri"] },
+  ]);
+  const [newPatternName, setNewPatternName] = useState("");
+  const [newPatternDays, setNewPatternDays] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
@@ -344,9 +349,41 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
     );
   };
 
+  const togglePatternDay = (day: string) => {
+    setNewPatternDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  };
+
+  const addPattern = () => {
+    if (!newPatternName.trim() || newPatternDays.length === 0) {
+      toast.error("Pattern name and days are required");
+      return;
+    }
+    setPatterns((prev) => [
+      ...prev,
+      {
+        id: `p${Date.now()}`,
+        name: newPatternName.trim(),
+        days: newPatternDays,
+      },
+    ]);
+    setNewPatternName("");
+    setNewPatternDays([]);
+  };
+
+  const removePattern = (id: string) => {
+    setPatterns((prev) => prev.filter((p) => p.id !== id));
+  };
+
   const handleCreate = async () => {
     if (!name.trim() || !price) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+
+    if (planType === "one-off" && patterns.length === 0) {
+      toast.error("One-off plans require at least one pattern");
       return;
     }
 
@@ -358,7 +395,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
         description: description.trim() || undefined,
         price: parseFloat(price),
         deliveryDays: planType === "weekly" ? selectedDays : undefined,
-        patterns: planType === "one-off" ? [] : undefined,
+        patterns: planType === "one-off" ? patterns : undefined,
         status: "active",
       });
       toast.success("Plan created successfully");
@@ -495,6 +532,90 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
                     {day}
                   </motion.button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Patterns (One-off only) */}
+          {planType === "one-off" && (
+            <div>
+              <label className="mb-3 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+                Delivery Patterns *
+              </label>
+
+              {/* Current Patterns */}
+              <div className="mb-4 space-y-2">
+                {patterns.map((pattern) => (
+                  <div
+                    key={pattern.id}
+                    className="flex items-center justify-between rounded-lg p-3"
+                    style={{ background: M.surface, border: `1px solid ${M.border}` }}
+                  >
+                    <div>
+                      <p className="text-[12px] font-bold" style={{ color: M.white }}>
+                        {pattern.name}
+                      </p>
+                      <p className="text-[11px]" style={{ color: M.textMuted }}>
+                        {pattern.days.join(", ")}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => removePattern(pattern.id)}
+                      className="text-[11px] font-bold transition-colors"
+                      style={{ color: M.red }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.opacity = "0.7")}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.opacity = "1")}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add Pattern Form */}
+              <div className="space-y-2 rounded-lg p-3" style={{ background: M.surface, border: `1px dashed ${M.border}` }}>
+                <input
+                  type="text"
+                  value={newPatternName}
+                  onChange={(e) => setNewPatternName(e.target.value)}
+                  placeholder="Pattern name (e.g. Mon-Wed-Fri)"
+                  className="w-full rounded-lg px-3 py-2 text-[12px] outline-none"
+                  style={{ border: `1px solid ${M.border}`, background: M.panel, color: M.white }}
+                />
+                <div className="flex gap-1">
+                  {days.map((day) => (
+                    <motion.button
+                      key={day}
+                      whileTap={{ scale: 0.94 }}
+                      onClick={() => togglePatternDay(day)}
+                      className="flex-1 rounded-md py-1.5 text-[11px] font-bold transition-colors"
+                      style={{
+                        background: newPatternDays.includes(day) ? M.gold : M.panel,
+                        color: newPatternDays.includes(day) ? "#000000" : M.textMuted,
+                        border: `1px solid ${newPatternDays.includes(day) ? M.gold : M.border}`,
+                      }}
+                    >
+                      {day}
+                    </motion.button>
+                  ))}
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={addPattern}
+                  className="w-full rounded-lg py-2 text-[11px] font-bold transition-colors"
+                  style={{ border: `1px solid ${M.gold}`, color: M.gold, background: "transparent" }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = M.gold;
+                    (e.currentTarget as HTMLElement).style.color = "#000000";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                    (e.currentTarget as HTMLElement).style.color = M.gold;
+                  }}
+                >
+                  + Add Pattern
+                </motion.button>
               </div>
             </div>
           )}
