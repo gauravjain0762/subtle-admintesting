@@ -195,32 +195,16 @@ export default function PlansPage() {
 
               {/* Stats Grid */}
               <div className="mb-5 grid grid-cols-2 gap-4 py-4 px-3 rounded-xl" style={{ background: M.surface }}>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: M.textFaint }}>
-                    Price/Week
-                  </p>
-                  <p className="mt-2 text-[18px] font-bold" style={{ color: M.gold }}>
-                    £{plan.price.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: M.textFaint }}>
-                    Subscriptions
-                  </p>
-                  <p className="mt-2 text-[18px] font-bold" style={{ color: M.white }}>
-                    {plan.activeSubs}
-                  </p>
-                </div>
               </div>
 
               {/* Delivery Info */}
-              {plan.type === "weekly" && plan.deliveryDays && (
+              {plan.type === "weekly" && plan.pattern && (
                 <div className="mb-5">
                   <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: M.textFaint }}>
                     Delivery Days
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {plan.deliveryDays.map((day) => (
+                    {plan.pattern.map((day) => (
                       <span
                         key={day}
                         className="inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-bold"
@@ -335,7 +319,6 @@ export default function PlansPage() {
 function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
   const [planType, setPlanType] = useState<"weekly" | "one-off">("weekly");
   const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [selectedDays, setSelectedDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
   const [patterns, setPatterns] = useState<DeliveryPattern[]>([
@@ -381,7 +364,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
   };
 
   const handleCreate = async () => {
-    if (!name.trim() || !price) {
+    if (!name.trim()) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -397,12 +380,11 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
         type: planType,
         name: name.trim(),
         description: description.trim() || undefined,
-        price: parseFloat(price),
-        deliveryDays: planType === "weekly" ? selectedDays : undefined,
+        pattern: planType === "weekly" ? selectedDays : undefined,
         patterns: planType === "one-off" ? patterns : undefined,
         status: "active",
       });
-      toast.success("Plan created successfully");
+      toast.success(`${name} plan created successfully!`);
       onSave();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to create plan");
@@ -491,25 +473,6 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
               placeholder="e.g. Mon-Fri delivery"
               rows={1}
               className="w-full resize-none rounded-lg px-4 py-1.5 text-[13px] outline-none"
-              style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
-              onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
-              onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}
-            />
-          </div>
-
-          {/* Price */}
-          <div>
-            <label className="mb-1 block text-[11px] font-bold" style={{ color: M.textMuted }}>
-              Price per Week (£) *
-            </label>
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="47.50"
-              step="0.01"
-              min="0"
-              className="w-full rounded-lg px-4 py-1.5 text-[13px] outline-none"
               style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
               onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
               onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}
@@ -664,9 +627,8 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
 
 function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () => void; onSave: () => void }) {
   const [name, setName] = useState(plan.name);
-  const [price, setPrice] = useState(plan.price.toString());
   const [description, setDescription] = useState(plan.description || "");
-  const [selectedDays, setSelectedDays] = useState<string[]>(plan.deliveryDays || ["Mon", "Tue", "Wed", "Thu", "Fri"]);
+  const [selectedDays, setSelectedDays] = useState<string[]>(plan.pattern || ["Mon", "Tue", "Wed", "Thu", "Fri"]);
   const [saving, setSaving] = useState(false);
 
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
@@ -678,7 +640,7 @@ function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () 
   };
 
   const handleSave = async () => {
-    if (!name.trim() || !price) {
+    if (!name.trim()) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -686,14 +648,12 @@ function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () 
     setSaving(true);
     try {
       await updatePlan(plan._id, {
-        type: plan.type,
         name: name.trim(),
         description: description.trim() || undefined,
-        price: parseFloat(price),
-        deliveryDays: plan.type === "weekly" ? selectedDays : undefined,
+        pattern: plan.type === "weekly" ? selectedDays : undefined,
         status: plan.status,
       });
-      toast.success("Plan updated successfully");
+      toast.success("Plan updated successfully!");
       onSave();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to update plan");
@@ -769,24 +729,6 @@ function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () 
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               className="w-full resize-none rounded-lg px-4 py-2.5 text-[13px] outline-none"
-              style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
-              onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
-              onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}
-            />
-          </div>
-
-          {/* Price */}
-          <div>
-            <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
-              Price per Week (£) *
-            </label>
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              step="0.01"
-              min="0"
-              className="w-full rounded-lg px-4 py-2.5 text-[13px] outline-none"
               style={{ border: `1px solid ${M.border}`, background: M.surface, color: M.white }}
               onFocus={(e) => ((e.target as HTMLElement).style.borderColor = M.gold)}
               onBlur={(e) => ((e.target as HTMLElement).style.borderColor = M.border)}

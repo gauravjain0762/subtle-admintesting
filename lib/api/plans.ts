@@ -10,9 +10,8 @@ export interface PlanPayload {
   type: "weekly" | "one-off";
   name: string;
   description?: string;
-  price: number;
-  deliveryDays?: string[];
-  patterns?: DeliveryPattern[];
+  pattern?: string[]; // For weekly plans: ["Mon", "Tue", "Wed", ...]
+  patterns?: DeliveryPattern[]; // For one-off plans
   status: "active" | "inactive";
 }
 
@@ -21,11 +20,9 @@ export interface Plan {
   type: "weekly" | "one-off";
   name: string;
   description?: string;
-  price: number;
-  deliveryDays?: string[];
-  patterns?: DeliveryPattern[];
+  pattern?: string[]; // For weekly plans
+  patterns?: DeliveryPattern[]; // For one-off plans
   status: "active" | "inactive";
-  activeSubs: number;
   createdAt: string;
   updatedAt: string;
 }
