@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Menu, LogOut, ChevronDown } from "lucide-react";
+import { Bell, Menu, LogOut, ChevronDown, Trash2, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { SkLogoMark } from "@/components/ui/sk-logo";
 import { logout } from "@/lib/api/auth";
 import { getStripeMode, switchStripeMode, type StripeModeResponse } from "@/lib/api/stripe";
+import { getNotifications, markNotificationAsRead, deleteNotification, type Notification } from "@/lib/api/notifications";
 import { ApiError } from "@/lib/api/client";
 
 interface TopbarProps {
@@ -21,9 +22,16 @@ export function Topbar({ onMobileMenuOpen, sidebarWidth = 264 }: TopbarProps) {
   const [stripeMode, setStripeMode] = useState<"test" | "live">("test");
   const [modeDropdownOpen, setModeDropdownOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotif, setLoadingNotif] = useState(false);
 
   useEffect(() => {
     fetchStripeMode();
+    fetchNotifications();
+    const notifInterval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(notifInterval);
   }, []);
 
   const fetchStripeMode = async () => {
@@ -50,6 +58,42 @@ export function Topbar({ onMobileMenuOpen, sidebarWidth = 264 }: TopbarProps) {
       toast.error(err instanceof ApiError ? err.message : "Failed to switch mode");
     } finally {
       setSwitching(false);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await getNotifications(1, 20, false);
+      setNotifications(res.notifications);
+      setUnreadCount(res.unreadCount);
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await markNotificationAsRead(notificationId);
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === notificationId ? { ...n, read: true } : n))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+      toast.success("Notification marked as read");
+    } catch (err) {
+      toast.error("Failed to mark notification as read");
+    }
+  };
+
+  const handleDeleteNotification = async (notificationId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await deleteNotification(notificationId);
+      setNotifications((prev) => prev.filter((n) => n._id !== notificationId));
+      fetchNotifications();
+      toast.success("Notification deleted");
+    } catch (err) {
+      toast.error("Failed to delete notification");
     }
   };
 
@@ -98,18 +142,129 @@ export function Topbar({ onMobileMenuOpen, sidebarWidth = 264 }: TopbarProps) {
 
         {/* ── Right cluster ── */}
         <div className="ml-auto flex items-center gap-2">
-          {/* Notifications bell */}
-          <button
-            className="relative flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-[#161616]"
-            style={{ color: "#888888" }}
-            aria-label="Notifications"
-          >
-            <Bell size={17} />
-            <span
-              className="absolute right-2 top-2 h-[7px] w-[7px] rounded-full"
-              style={{ background: "#f8e396" }}
-            />
-          </button>
+          {/* Notifications bell with dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              className="relative flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-[#161616]"
+              style={{ color: "#888888" }}
+              aria-label="Notifications"
+            >
+              <Bell size={17} />
+              {unreadCount > 0 && (
+                <span
+                  className="absolute right-2 top-2 h-[7px] w-[7px] rounded-full animate-pulse"
+                  style={{ background: "#f8e396" }}
+                />
+              )}
+            </button>
+
+            {/* Notifications Dropdown */}
+            <AnimatePresence>
+              {notificationsOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute right-0 top-full z-50 mt-2 w-[360px] max-w-[calc(100vw-16px)] rounded-xl overflow-hidden"
+                  style={{ background: "#141414", border: "1px solid rgba(248,227,150,0.2)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b p-4" style={{ borderColor: "#1e1e1e" }}>
+                    <div>
+                      <h3 className="text-[13px] font-bold" style={{ color: "#ffffff" }}>
+                        Notifications
+                      </h3>
+                      {unreadCount > 0 && (
+                        <p className="mt-0.5 text-[11px]" style={{ color: "#f8e396" }}>
+                          {unreadCount} unread
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Notifications List */}
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center gap-2 px-4 py-8">
+                        <Bell size={24} style={{ color: "#444444" }} />
+                        <p className="text-[12px]" style={{ color: "#666666" }}>
+                          No notifications
+                        </p>
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <motion.div
+                          key={notif._id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 8 }}
+                          className="flex gap-3 border-b p-3 transition-colors hover:bg-[#1a1a1a]"
+                          style={{ borderColor: "#1e1e1e" }}
+                        >
+                          {/* Icon */}
+                          <div className="mt-0.5 shrink-0">
+                            {notif.type === "workspace_request" ? (
+                              <span className="text-[16px]">🏢</span>
+                            ) : (
+                              <span className="text-[16px]">🛒</span>
+                            )}
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-[12px] font-bold" style={{ color: "#ffffff" }}>
+                              {notif.title}
+                            </h4>
+                            <p className="mt-1 text-[11px] line-clamp-2" style={{ color: "#888888" }}>
+                              {notif.message}
+                            </p>
+                            {notif.type === "workspace_request" && notif.data.workspaceName && (
+                              <p className="mt-1.5 text-[10px]" style={{ color: "#666666" }}>
+                                {notif.data.workspaceName} • {notif.data.contactEmail}
+                              </p>
+                            )}
+                            {notif.type === "new_order" && notif.data.orderNumber && (
+                              <p className="mt-1.5 text-[10px]" style={{ color: "#666666" }}>
+                                {notif.data.orderNumber} • £{notif.data.orderTotal} • {notif.data.planType}
+                              </p>
+                            )}
+                            <p className="mt-1 text-[10px]" style={{ color: "#555555" }}>
+                              {new Date(notif.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex shrink-0 flex-col gap-1">
+                            {!notif.read && (
+                              <button
+                                onClick={(e) => handleMarkAsRead(notif._id, e)}
+                                className="flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-[#1a1a1a]"
+                                style={{ color: "#f8e396" }}
+                                title="Mark as read"
+                              >
+                                <Check size={14} />
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => handleDeleteNotification(notif._id, e)}
+                              className="flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-[#1a1a1a]"
+                              style={{ color: "#888888" }}
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* Stripe Mode Dropdown */}
           <div className="relative">
