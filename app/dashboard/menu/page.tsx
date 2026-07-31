@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getDishes, toggleDishAvailable, deleteDish, type Dish } from "@/lib/menu-store";
+import { checkDishUsage, type DishUsageCheck } from "@/lib/api/dishes";
 import { getMenus, type Menu } from "@/lib/menus-store";
 import { fetchCompanies, assignDishToCompanies, getAssignedCompanies, type Company } from "@/lib/api/companies";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
@@ -183,6 +184,88 @@ function AssignDialog({
   );
 }
 
+/* ── Dish Usage Warning Modal ──────────────────────────────────── */
+function DishUsageWarningModal({
+  dish,
+  usage,
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  dish: Dish;
+  usage: { activeOrders: number; activeSubscriptions: number; affectedCustomers: number };
+  message: string | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      className={`fixed inset-0 z-[80] flex items-center justify-center p-4 ${montserrat.className}`}
+      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0, y: 12 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 420, damping: 30 }}
+        className="w-full max-w-[420px] rounded-xl p-7"
+        style={{ background: M.panel, border: `1px solid ${M.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl" style={{ background: "rgba(255, 193, 7, 0.1)" }}>
+          <div className="text-[24px]">⚠️</div>
+        </div>
+        <h2 className="text-[16px] font-bold" style={{ color: M.white }}>
+          Cannot Delete — Dish In Use
+        </h2>
+        <p className="mt-3 text-[13px] leading-relaxed" style={{ color: M.textMuted }}>
+          <span className="font-semibold" style={{ color: M.white }}>{dish.name}</span> is being used by{" "}
+          <span className="font-semibold" style={{ color: M.gold }}>{usage.affectedCustomers} customer{usage.affectedCustomers !== 1 ? "s" : ""}</span>.
+        </p>
+
+        <div className="mt-5 space-y-2 rounded-lg p-4" style={{ background: M.surface, border: `1px solid ${M.border}` }}>
+          <p className="text-[12px] font-semibold" style={{ color: M.gold }}>
+            Deleting will affect:
+          </p>
+          <div className="space-y-1.5 text-[12px]" style={{ color: M.textMuted }}>
+            <p>• {usage.activeOrders} active order{usage.activeOrders !== 1 ? "s" : ""}</p>
+            <p>• {usage.activeSubscriptions} active subscription{usage.activeSubscriptions !== 1 ? "s" : ""}</p>
+          </div>
+          {message && <p className="mt-3 text-[11px] italic" style={{ color: M.textFaint }}>{message}</p>}
+        </div>
+
+        <p className="mt-5 text-[12px] leading-relaxed" style={{ color: M.textFaint }}>
+          Customers will lose access to this meal option in their current orders and subscriptions.
+        </p>
+
+        <div className="mt-7 flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors"
+            style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; (e.currentTarget as HTMLElement).style.color = M.gold; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = M.border; (e.currentTarget as HTMLElement).style.color = M.textMuted; }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 rounded-lg py-2.5 text-[13px] font-bold transition-opacity hover:opacity-90"
+            style={{ background: M.red, color: "#000000" }}
+          >
+            Delete Anyway
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ── Delete dialog ──────────────────────────────────────────────── */
 function DeleteDialog({ dish, onConfirm, onCancel }: { dish: Dish; onConfirm: () => void; onCancel: () => void }) {
   return (
@@ -252,6 +335,9 @@ export default function MenuPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [assignLoading, setAssignLoading] = useState(false);
+  const [usageData, setUsageData] = useState<DishUsageCheck | null>(null);
+  const [showUsageWarning, setShowUsageWarning] = useState(false);
+  const [checkingUsage, setCheckingUsage] = useState(false);
 
   const refresh = () => {
     setLoading(true);
@@ -335,6 +421,25 @@ export default function MenuPage() {
     }
   };
 
+  const handleCheckUsageAndDelete = async (dish: Dish) => {
+    setDeleteTarget(dish);
+    setCheckingUsage(true);
+    try {
+      const usage = await checkDishUsage(dish.id);
+      setUsageData(usage);
+      if (usage.isInUse) {
+        setShowUsageWarning(true);
+      } else {
+        setShowUsageWarning(false);
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to check dish usage");
+      setDeleteTarget(null);
+    } finally {
+      setCheckingUsage(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setWorkingId(deleteTarget.id);
@@ -347,6 +452,8 @@ export default function MenuPage() {
     } finally {
       setWorkingId(null);
       setDeleteTarget(null);
+      setShowUsageWarning(false);
+      setUsageData(null);
     }
   };
 
@@ -687,8 +794,8 @@ export default function MenuPage() {
 
                           <div className="my-1 h-px" style={{ background: M.border }} />
                           <button
-                            onClick={() => { setOpenMenuId(null); setDeleteTarget(dish); }}
-                            disabled={workingId === dish.id}
+                            onClick={() => { setOpenMenuId(null); handleCheckUsageAndDelete(dish); }}
+                            disabled={workingId === dish.id || checkingUsage}
                             className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
                             style={{ color: M.red }}
                             onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
@@ -741,11 +848,28 @@ export default function MenuPage() {
 
       {/* Delete dialog */}
       <AnimatePresence>
-        {deleteTarget && (
+        {deleteTarget && showUsageWarning && usageData && usageData.isInUse && (
+          <DishUsageWarningModal
+            dish={deleteTarget}
+            usage={usageData.usage}
+            message={usageData.message}
+            onConfirm={() => setShowUsageWarning(false)}
+            onCancel={() => {
+              setDeleteTarget(null);
+              setShowUsageWarning(false);
+              setUsageData(null);
+            }}
+          />
+        )}
+        {deleteTarget && !showUsageWarning && (
           <DeleteDialog
             dish={deleteTarget}
             onConfirm={handleDelete}
-            onCancel={() => setDeleteTarget(null)}
+            onCancel={() => {
+              setDeleteTarget(null);
+              setShowUsageWarning(false);
+              setUsageData(null);
+            }}
           />
         )}
       </AnimatePresence>

@@ -82,6 +82,22 @@ export async function updateDish(id: string, patch: DishPayload, images?: (File 
   return res.dish;
 }
 
+export interface DishUsageCheck {
+  success: boolean;
+  isInUse: boolean;
+  usage: {
+    activeOrders: number;
+    activeSubscriptions: number;
+    affectedCustomers: number;
+  };
+  message: string | null;
+}
+
+export async function checkDishUsage(dishId: string): Promise<DishUsageCheck> {
+  const res = await apiFetch<DishUsageCheck>(`/api/admin/dishes/${dishId}/usage-check`);
+  return res;
+}
+
 export async function deleteDish(id: string): Promise<void> {
   await apiFetch(`/api/admin/dishes/${id}`, { method: "DELETE" });
 }
