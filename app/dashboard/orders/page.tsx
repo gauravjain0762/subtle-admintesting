@@ -37,7 +37,7 @@ const M = {
 };
 
 const STATUS_FILTERS = ["All", "New", "Delivered", "Cancelled"];
-const TYPE_FILTERS   = ["All Types", "Weekly", "One-off"];
+const TYPE_FILTERS   = ["All Types", "Weekly", "One-time"];
 const DAY_FILTERS    = ["All Time", "Today", "Yesterday", "Last 7 Days", "Custom Date"];
 const ALL_COMPANIES  = "All Companies";
 const PAGE_SIZE      = 10;
@@ -109,12 +109,13 @@ function StatusBadge({ status }: { status: OrderStatus }) {
 }
 
 function TypeBadge({ type }: { type: OrderType }) {
+  const displayType = type === "one-off" ? "One-time" : type === "weekly" ? "Weekly" : type;
   return (
     <span
       className="rounded-md px-2.5 py-1 text-[10.5px] font-semibold capitalize"
       style={{ background: M.surface, color: M.goldMuted, border: `1px solid ${M.border}` }}
     >
-      {type}
+      {displayType}
     </span>
   );
 }
@@ -245,7 +246,7 @@ export default function OrdersPage() {
       page: currentPage,
       limit: PAGE_SIZE,
       status: statusFilter === "All" ? undefined : (statusFilter.toLowerCase() as OrderStatus),
-      type: typeFilter === "All Types" ? undefined : (typeFilter.toLowerCase() as OrderType),
+      type: typeFilter === "All Types" ? undefined : (typeFilter === "One-time" ? "one-off" : typeFilter.toLowerCase() as OrderType),
       workspaceId: companyId,
       dayFilter: DAY_FILTER_PARAM[dayFilter],
       startDate: dayFilter === "Custom Date" ? customStartDate : undefined,
@@ -294,7 +295,7 @@ export default function OrdersPage() {
       const companyId = companyFilter === ALL_COMPANIES ? undefined : companies.find((c) => c.name === companyFilter)?.id;
       const list = await getAllOrders({
         status: statusFilter === "All" ? undefined : (statusFilter.toLowerCase() as OrderStatus),
-        type: typeFilter === "All Types" ? undefined : (typeFilter.toLowerCase() as OrderType),
+        type: typeFilter === "All Types" ? undefined : (typeFilter === "One-time" ? "one-off" : typeFilter.toLowerCase() as OrderType),
         workspaceId: companyId,
         dayFilter: DAY_FILTER_PARAM[dayFilter],
         startDate: dayFilter === "Custom Date" ? customStartDate : undefined,
