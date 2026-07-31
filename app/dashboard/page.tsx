@@ -169,8 +169,15 @@ export default function DashboardPage() {
 
   const totalOrdersToday = useMemo(() => allOrders.filter((o) => isInDateRange(o.dateISO)).length, [allOrders, dateRange]);
   const oneOffOrders     = useMemo(() => allOrders.filter((o) => o.type === "one-off" && isInDateRange(o.dateISO)).length, [allOrders, dateRange]);
-  const standardMenuCount = useMemo(() => menus.filter((m) => m.isDefault).length, [menus]);
-  const customMenuCount   = useMemo(() => menus.filter((m) => !m.isDefault).length, [menus]);
+  const standardMenuCount = useMemo(() => {
+    const standardMenuIds = menus.filter((m) => m.isDefault).map((m) => m.id);
+    return dishes.filter((d) => standardMenuIds.includes(d.menuId ?? "standard")).length;
+  }, [menus, dishes]);
+
+  const customMenuCount = useMemo(() => {
+    const customMenuIds = menus.filter((m) => !m.isDefault).map((m) => m.id);
+    return dishes.filter((d) => customMenuIds.includes(d.menuId ?? "")).length;
+  }, [menus, dishes]);
 
   const revenueToday = useMemo(
     () => allOrders.filter((o) => isInDateRange(o.dateISO)).reduce((sum, o) => sum + parseAmount(o.totalAmount), 0),
