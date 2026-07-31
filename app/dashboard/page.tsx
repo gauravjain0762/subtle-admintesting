@@ -8,7 +8,7 @@ import { getAllOrders, parseAmount, type Order } from "@/lib/orders-store";
 import { getMenus, type Menu } from "@/lib/menus-store";
 import { getDishes, type Dish } from "@/lib/menu-store";
 import { getNewEnquiriesCount } from "@/lib/enquiries-store";
-import { getActiveWeeklySubscriptionsCount } from "@/lib/subscriptions-store";
+import { getActiveWeeklySubscriptionsCount, getActiveDayOffPlanCount } from "@/lib/subscriptions-store";
 
 /* ── Mentor project reference: Montserrat, scoped to this page only ── */
 const montserrat = Montserrat({
@@ -131,6 +131,7 @@ export default function DashboardPage() {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [newEnquiries, setNewEnquiries] = useState(0);
   const [activeSubs, setActiveSubs] = useState(0);
+  const [dayOffPlans, setDayOffPlans] = useState(0);
   const [dateFilter, setDateFilter] = useState<"today" | "week" | "month">("today");
 
   useEffect(() => {
@@ -139,6 +140,7 @@ export default function DashboardPage() {
     getDishes().then(setDishes).catch(() => setDishes([]));
     getNewEnquiriesCount().then(setNewEnquiries).catch(() => setNewEnquiries(0));
     setActiveSubs(getActiveWeeklySubscriptionsCount());
+    setDayOffPlans(getActiveDayOffPlanCount());
   }, []);
 
   const getDateRange = () => {
@@ -259,6 +261,11 @@ export default function DashboardPage() {
           label="One-Time Orders"
           value={oneOffOrders}
           delay={0.08}
+        />
+        <StatCell
+          label="One-Day Off Plans"
+          value={dayOffPlans}
+          delay={0.1}
         />
 
         <StatCell
