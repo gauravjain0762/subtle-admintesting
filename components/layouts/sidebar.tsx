@@ -44,7 +44,7 @@ const NAV: NavEntry[] = [
     ],
   },
   { label: "Meal Management", href: "/dashboard/menu", icon: UtensilsCrossed },
-  { label: "Plan Management", href: "/dashboard/plans", icon: CreditCard },
+  { label: "Subscription & Plans", href: "/dashboard/plans", icon: CreditCard },
   // { label: "Weekly Menu", href: "/dashboard/weekly-menu", icon: CalendarDays },
 
   { label: "Customer Management", href: "/dashboard/customers", icon: Users },
