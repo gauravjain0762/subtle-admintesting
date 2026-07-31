@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Edit2, Trash2, MoreVertical, Eye, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { getPlans, createPlan, updatePlan, deletePlan, type Plan as PlanType, type DeliveryPattern } from "@/lib/api/plans";
+import { getPlanSubscribers, type SubscribersResponse } from "@/lib/api/subscribers";
 import { ApiError } from "@/lib/api/client";
 
 const montserrat = Montserrat({
@@ -35,6 +36,9 @@ export default function PlansPage() {
   const [activeTab, setActiveTab] = useState<"all" | "weekly" | "one-off">("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanType | null>(null);
+  const [subscribersData, setSubscribersData] = useState<SubscribersResponse | null>(null);
+  const [showSubscribersModal, setShowSubscribersModal] = useState(false);
+  const [loadingSubscribers, setLoadingSubscribers] = useState(false);
 
   useEffect(() => {
     fetchPlans();
@@ -49,6 +53,20 @@ export default function PlansPage() {
       toast.error(err instanceof ApiError ? err.message : "Failed to load plans");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewSubscribers = async (plan: PlanType) => {
+    setShowSubscribersModal(true);
+    setLoadingSubscribers(true);
+    try {
+      const data = await getPlanSubscribers(plan._id);
+      setSubscribersData(data);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to load subscribers");
+      setShowSubscribersModal(false);
+    } finally {
+      setLoadingSubscribers(false);
     }
   };
 
@@ -267,6 +285,7 @@ export default function PlansPage() {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
+                  onClick={() => handleViewSubscribers(plan)}
                   className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-[11px] font-bold transition-all"
                   style={{
                     border: `1px solid ${M.border}`,
@@ -311,6 +330,16 @@ export default function PlansPage() {
               onSave={() => {
                 setEditingPlan(null);
                 fetchPlans();
+              }}
+            />
+          )}
+          {showSubscribersModal && subscribersData && (
+            <SubscribersModal
+              data={subscribersData}
+              isLoading={loadingSubscribers}
+              onClose={() => {
+                setShowSubscribersModal(false);
+                setSubscribersData(null);
               }}
             />
           )}
@@ -796,6 +825,164 @@ function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () 
           >
             {saving ? "Saving..." : "Save Changes"}
           </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function SubscribersModal({
+  data,
+  isLoading,
+  onClose,
+}: {
+  data: SubscribersResponse;
+  isLoading: boolean;
+  onClose: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"all" | "active" | "paused">("all");
+
+  const filteredSubscribers = data.subscribers.filter((sub) => {
+    if (activeTab === "all") return true;
+    return sub.status === activeTab;
+  });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="flex flex-col rounded-xl w-full max-w-2xl max-h-[85vh] overflow-hidden"
+        style={{ background: M.panel, border: `1px solid ${M.border}` }}
+      >
+        {/* Header */}
+        <div className="shrink-0 border-b p-5" style={{ borderColor: M.border }}>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-[18px] font-bold" style={{ color: M.gold }}>
+                {data.plan.name}
+              </h2>
+              <p className="text-[12px] mt-1" style={{ color: M.textMuted }}>
+                Plan Type: {data.plan.type === "weekly" ? "Weekly" : "One-Off"}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-[20px] transition-colors"
+              style={{ color: M.textMuted }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.color = M.gold;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.color = M.textMuted;
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="mt-4 flex gap-2">
+            {(["all", "active", "paused"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className="px-3 py-1.5 text-[11px] font-bold rounded-lg transition-colors"
+                style={{
+                  background: activeTab === tab ? M.gold : M.surface,
+                  color: activeTab === tab ? "#000000" : M.textMuted,
+                  border: `1px solid ${activeTab === tab ? M.gold : M.border}`,
+                }}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)} ({filteredSubscribers.length})
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <p style={{ color: M.textMuted }}>Loading subscribers...</p>
+            </div>
+          ) : filteredSubscribers.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p style={{ color: M.textFaint }}>No subscribers found</p>
+            </div>
+          ) : (
+            <div className="space-y-3 p-5">
+              {filteredSubscribers.map((subscriber) => (
+                <motion.div
+                  key={subscriber._id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-lg p-4 space-y-2"
+                  style={{ background: M.surface, border: `1px solid ${M.border}` }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="text-[13px] font-bold" style={{ color: M.white }}>
+                        {subscriber.user.name}
+                      </p>
+                      <p className="text-[11px]" style={{ color: M.textMuted }}>
+                        {subscriber.user.email}
+                      </p>
+                    </div>
+                    <div
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-black"
+                      style={{
+                        background:
+                          subscriber.status === "active"
+                            ? M.green
+                            : subscriber.status === "paused"
+                            ? "#f59e0b"
+                            : M.red,
+                      }}
+                    >
+                      {subscriber.status.charAt(0).toUpperCase() + subscriber.status.slice(1)}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-[11px]">
+                    <div>
+                      <p style={{ color: M.textFaint }}>Meal</p>
+                      <p style={{ color: M.white }}>{subscriber.meal.name}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: M.textFaint }}>Quantity</p>
+                      <p style={{ color: M.white }}>{subscriber.quantity}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: M.textFaint }}>Pattern</p>
+                      <p style={{ color: M.white }}>{subscriber.pattern.join(", ")}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: M.textFaint }}>Next Charge</p>
+                      <p style={{ color: M.white }}>
+                        {new Date(subscriber.nextChargeDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 border-t p-4" style={{ borderColor: M.border }}>
+          <p className="text-[11px]" style={{ color: M.textMuted }}>
+            Showing {filteredSubscribers.length} of {data.subscribers.length} subscribers
+          </p>
         </div>
       </motion.div>
     </motion.div>
