@@ -256,7 +256,7 @@ export default function DashboardPage() {
           delay={0.04}
         />
         <StatCell
-          label="One-Off Orders"
+          label="One-Time Orders"
           value={oneOffOrders}
           delay={0.08}
         />
