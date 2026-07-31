@@ -847,6 +847,11 @@ function SubscribersModal({
     return sub.status === activeTab;
   });
 
+  const getTabCount = (tab: typeof activeTab) => {
+    if (tab === "all") return data.subscribers.length;
+    return data.subscribers.filter((sub) => sub.status === tab).length;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -902,7 +907,7 @@ function SubscribersModal({
                   border: `1px solid ${activeTab === tab ? M.gold : M.border}`,
                 }}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)} ({filteredSubscribers.length})
+                {tab.charAt(0).toUpperCase() + tab.slice(1)} ({getTabCount(tab)})
               </button>
             ))}
           </div>
