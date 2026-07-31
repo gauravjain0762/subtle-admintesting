@@ -797,28 +797,12 @@ export default function MenuPage() {
                           <button
                             onClick={() => { setOpenMenuId(null); handleCheckUsageAndDelete(dish); }}
                             disabled={workingId === dish.id || checkingUsage}
-                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{ color: checkingUsage ? M.textMuted : M.red }}
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                            style={{ color: M.red }}
                             onMouseEnter={(e) => { if (!checkingUsage) (e.currentTarget as HTMLElement).style.background = M.surface; }}
-                            onMouseLeave={(e) => { if (!checkingUsage) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                           >
-                            {checkingUsage ? (
-                              <>
-                                <div style={{
-                                  width: 13,
-                                  height: 13,
-                                  border: `2px solid ${M.textMuted}`,
-                                  borderTop: `2px solid ${M.gold}`,
-                                  borderRadius: "50%",
-                                  animation: "spin 0.8s linear infinite"
-                                }} />
-                                Checking...
-                              </>
-                            ) : (
-                              <>
-                                <Trash2 size={13} /> Delete
-                              </>
-                            )}
+                            <Trash2 size={13} /> Delete
                           </button>
                           </RowActionsMenu>
                         </div>
@@ -865,7 +849,35 @@ export default function MenuPage() {
 
       {/* Delete dialog */}
       <AnimatePresence>
-        {deleteTarget && showUsageWarning && usageData && usageData.isInUse && (
+        {deleteTarget && checkingUsage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className={`fixed inset-0 z-[90] flex items-center justify-center ${montserrat.className}`}
+            style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="flex flex-col items-center gap-4 rounded-xl p-8"
+              style={{ background: M.panel, border: `1px solid ${M.border}` }}
+            >
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  border: `3px solid ${M.border}`,
+                  borderTop: `3px solid ${M.gold}`,
+                  borderRadius: "50%",
+                  animation: "spin 0.8s linear infinite"
+                }}
+              />
+              <p style={{ color: M.gold, fontSize: "14px", fontWeight: 600 }}>Checking dish usage...</p>
+            </motion.div>
+          </motion.div>
+        )}
+        {deleteTarget && !checkingUsage && showUsageWarning && usageData && usageData.isInUse && (
           <DishUsageWarningModal
             dish={deleteTarget}
             usage={usageData.usage}
@@ -878,7 +890,7 @@ export default function MenuPage() {
             }}
           />
         )}
-        {deleteTarget && !showUsageWarning && (
+        {deleteTarget && !checkingUsage && !showUsageWarning && (
           <DeleteDialog
             dish={deleteTarget}
             onConfirm={handleDelete}
