@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Montserrat } from "next/font/google";
 import { getAllOrders, parseAmount, type Order } from "@/lib/orders-store";
@@ -106,21 +107,25 @@ function CardHeader({
 
 /* ── Simple number stat card ── */
 function StatCell({
-  label, value, toggle, delay = 0,
+  label, value, toggle, delay = 0, onClick,
 }: {
   label: string; value: React.ReactNode;
   toggle?: { options: string[]; active: string; onChange: (v: string) => void };
   delay?: number;
+  onClick?: () => void;
 }) {
   return (
-    <DashCard delay={delay}>
-      <CardHeader label={label} toggle={toggle} />
-      <p className="text-[42px] font-bold leading-none" style={{ color: M.gold, letterSpacing: "-1px" }}>{value}</p>
-    </DashCard>
+    <div onClick={onClick} style={{ cursor: onClick ? "pointer" : "default" }}>
+      <DashCard delay={delay}>
+        <CardHeader label={label} toggle={toggle} />
+        <p className="text-[42px] font-bold leading-none" style={{ color: M.gold, letterSpacing: "-1px" }}>{value}</p>
+      </DashCard>
+    </div>
   );
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -175,12 +180,13 @@ export default function DashboardPage() {
         </p>
       </motion.div>
 
-      {/* ── 8-card stats grid — row 1 of 4, row 2 of 4 ── */}
+      {/* ── 7-card stats grid (removed Top Selling Meals) ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCell
           label="Total Orders"
           value={totalOrdersToday}
           delay={0}
+          onClick={() => router.push("/dashboard/orders")}
         />
         <StatCell
           label="Weekly Subscriptions"
@@ -200,26 +206,21 @@ export default function DashboardPage() {
         />
 
         <StatCell
-          label="New Business Enquiries"
+          label="New Company Enquiries"
           value={newEnquiries}
           delay={0.16}
-        />
-
-        <StatCell
-          label="Top Selling Meals"
-          value={topMealToday ? `×${topMealToday.qty}` : "—"}
-          delay={0.2}
+          onClick={() => router.push("/dashboard/company-management/requests")}
         />
 
         <StatCell
           label="Total Standard Menu"
           value={standardMenuCount}
-          delay={0.24}
+          delay={0.2}
         />
         <StatCell
           label="Total Custom Menu"
           value={customMenuCount}
-          delay={0.28}
+          delay={0.24}
         />
       </div>
 
