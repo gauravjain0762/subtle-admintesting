@@ -200,14 +200,12 @@ export default function DashboardPage() {
         initial={{ opacity: 0, y: -14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+        className="flex items-center justify-between gap-4"
       >
         <h1 className="text-[28px] font-extrabold leading-none" style={{ color: M.gold, letterSpacing: "0.08em" }}>Dashboard</h1>
-        <p className="mt-2 text-[13px] font-normal" style={{ color: "rgba(248,227,150,0.5)" }}>
-          {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-        </p>
 
         {/* Date Filter */}
-        <div className="mt-4 flex gap-2">
+        <div className="flex gap-2">
           {(["today", "week", "month"] as const).map((filter) => (
             <motion.button
               key={filter}
