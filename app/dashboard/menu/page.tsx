@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Montserrat } from "next/font/google";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -319,6 +319,7 @@ function DeleteDialog({ dish, onConfirm, onCancel }: { dish: Dish; onConfirm: ()
 /* ── Page ───────────────────────────────────────────────────────── */
 export default function MenuPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [dishes,       setDishes]       = useState<Dish[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [menus,        setMenus]        = useState<Menu[]>([]);
@@ -350,6 +351,13 @@ export default function MenuPage() {
     refresh();
     setMenus(getMenus());
   }, []);
+
+  useEffect(() => {
+    const filter = searchParams.get("filter");
+    if (filter === "standard" || filter === "custom") {
+      setMenuFilter(filter);
+    }
+  }, [searchParams]);
 
   const handleAssignClick = async (dish: Dish) => {
     setAssignTarget(dish);

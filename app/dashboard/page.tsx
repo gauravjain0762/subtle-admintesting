@@ -278,11 +278,13 @@ export default function DashboardPage() {
           label="Total Standard Menu"
           value={standardMenuCount}
           delay={0.2}
+          onClick={() => router.push("/dashboard/menu?filter=standard")}
         />
         <StatCell
           label="Total Custom Menu"
           value={customMenuCount}
           delay={0.24}
+          onClick={() => router.push("/dashboard/menu?filter=custom")}
         />
       </div>
 
