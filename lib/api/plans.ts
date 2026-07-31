@@ -7,7 +7,7 @@ export interface DeliveryPattern {
 }
 
 export interface PlanPayload {
-  type: "weekly" | "one-off";
+  type: "weekly" | "one-off" | "one-time-order";
   name: string;
   description?: string;
   pattern?: string[]; // For weekly plans: ["Mon", "Tue", "Wed", ...]
@@ -17,7 +17,7 @@ export interface PlanPayload {
 
 export interface Plan {
   _id: string;
-  type: "weekly" | "one-off";
+  type: "weekly" | "one-off" | "one-time-order";
   name: string;
   description?: string;
   pattern?: string[]; // For weekly plans

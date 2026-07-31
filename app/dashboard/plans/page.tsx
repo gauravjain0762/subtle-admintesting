@@ -33,7 +33,7 @@ const M = {
 export default function PlansPage() {
   const [plans, setPlans] = useState<PlanType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"all" | "weekly" | "one-off">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "weekly" | "one-day-off" | "one-time-order">("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanType | null>(null);
   const [subscribersData, setSubscribersData] = useState<SubscribersResponse | null>(null);
@@ -72,7 +72,10 @@ export default function PlansPage() {
 
   const filtered = plans.filter((p) => {
     if (activeTab === "all") return true;
-    return p.type === activeTab;
+    if (activeTab === "weekly") return p.type === "weekly";
+    if (activeTab === "one-day-off") return p.type === "one-off";
+    if (activeTab === "one-time-order") return p.type === "one-time-order";
+    return false;
   });
 
   return (
@@ -119,7 +122,7 @@ export default function PlansPage() {
         className="mb-6 flex w-fit overflow-hidden rounded-lg border"
         style={{ borderColor: M.goldFaint }}
       >
-        {(["all", "weekly", "one-off"] as const).map((tab, i) => (
+        {(["all", "weekly", "one-day-off", "one-time-order"] as const).map((tab, i) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -127,7 +130,7 @@ export default function PlansPage() {
             style={{
               background: activeTab === tab ? M.gold : "transparent",
               color: activeTab === tab ? "#000000" : M.gold,
-              borderRight: i < 2 ? `1px solid rgba(248,227,150,0.2)` : "none",
+              borderRight: i < 3 ? `1px solid rgba(248,227,150,0.2)` : "none",
             }}
             onMouseEnter={(e) => {
               if (activeTab !== tab) (e.currentTarget as HTMLElement).style.background = "rgba(248,227,150,0.08)";
@@ -136,7 +139,7 @@ export default function PlansPage() {
               if (activeTab !== tab) (e.currentTarget as HTMLElement).style.background = "transparent";
             }}
           >
-            {tab === "all" ? "All Plans" : tab === "weekly" ? "Weekly" : "One-off"}
+            {tab === "all" ? "All Plans" : tab === "weekly" ? "Weekly Plan" : tab === "one-day-off" ? "One-Day Off" : "One-Time Order"}
           </button>
         ))}
       </motion.div>
@@ -351,7 +354,7 @@ export default function PlansPage() {
 }
 
 function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [planType, setPlanType] = useState<"weekly" | "one-off">("weekly");
+  const [planType, setPlanType] = useState<"weekly" | "one-off" | "one-time-order">("weekly");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedDays, setSelectedDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
@@ -461,7 +464,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
               Plan Type
             </label>
             <div className="flex gap-3">
-              {(["weekly", "one-off"] as const).map((type) => (
+              {(["weekly", "one-off", "one-time-order"] as const).map((type) => (
                 <label key={type} className="flex items-center gap-2">
                   <input
                     type="radio"
@@ -472,7 +475,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
                     className="h-4 w-4"
                   />
                   <span className="text-[12px]" style={{ color: M.white }}>
-                    {type === "weekly" ? "Weekly" : "One-off Pattern"}
+                    {type === "weekly" ? "Weekly" : type === "one-off" ? "One-Day Off" : "One-Time Order"}
                   </span>
                 </label>
               ))}
