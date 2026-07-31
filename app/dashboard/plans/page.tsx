@@ -179,6 +179,11 @@ export default function PlansPage() {
                   <p className="mt-1.5 text-[11px] font-medium" style={{ color: M.textMuted }}>
                     {plan.type === "weekly" ? "Weekly Plan" : "One-off Pattern"}
                   </p>
+                  {plan.description && (
+                    <p className="mt-2 text-[12px] line-clamp-2" style={{ color: M.textMuted }}>
+                      {plan.description}
+                    </p>
+                  )}
                 </div>
                 <motion.span
                   whileHover={{ scale: 1.1 }}
