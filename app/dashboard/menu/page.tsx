@@ -494,6 +494,7 @@ export default function MenuPage() {
 
   return (
     <div className={`space-y-6 ${montserrat.className}`}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -16 }}
@@ -796,12 +797,28 @@ export default function MenuPage() {
                           <button
                             onClick={() => { setOpenMenuId(null); handleCheckUsageAndDelete(dish); }}
                             disabled={workingId === dish.id || checkingUsage}
-                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-colors disabled:opacity-50"
-                            style={{ color: M.red }}
-                            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = M.surface)}
-                            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                            className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[12.5px] font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ color: checkingUsage ? M.textMuted : M.red }}
+                            onMouseEnter={(e) => { if (!checkingUsage) (e.currentTarget as HTMLElement).style.background = M.surface; }}
+                            onMouseLeave={(e) => { if (!checkingUsage) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                           >
-                            <Trash2 size={13} /> Delete
+                            {checkingUsage ? (
+                              <>
+                                <div style={{
+                                  width: 13,
+                                  height: 13,
+                                  border: `2px solid ${M.textMuted}`,
+                                  borderTop: `2px solid ${M.gold}`,
+                                  borderRadius: "50%",
+                                  animation: "spin 0.8s linear infinite"
+                                }} />
+                                Checking...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 size={13} /> Delete
+                              </>
+                            )}
                           </button>
                           </RowActionsMenu>
                         </div>
