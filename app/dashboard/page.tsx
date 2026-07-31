@@ -131,6 +131,7 @@ export default function DashboardPage() {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [newEnquiries, setNewEnquiries] = useState(0);
   const [activeSubs, setActiveSubs] = useState(0);
+  const [dateFilter, setDateFilter] = useState<"today" | "week" | "month">("today");
 
   useEffect(() => {
     getAllOrders().then(setAllOrders).catch(() => setAllOrders([]));
@@ -140,18 +141,44 @@ export default function DashboardPage() {
     setActiveSubs(getActiveWeeklySubscriptionsCount());
   }, []);
 
-  const totalOrdersToday = useMemo(() => allOrders.filter((o) => daysSince(o.dateISO) === 0).length, [allOrders]);
-  const oneOffOrders     = useMemo(() => allOrders.filter((o) => o.type === "one-off").length, [allOrders]);
+  const getDateRange = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfToday = today.toISOString().split("T")[0];
+
+    if (dateFilter === "today") {
+      return { start: startOfToday, end: startOfToday };
+    }
+    if (dateFilter === "week") {
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      return { start: startOfWeek.toISOString().split("T")[0], end: endOfWeek.toISOString().split("T")[0] };
+    }
+    if (dateFilter === "month") {
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      return { start: startOfMonth.toISOString().split("T")[0], end: endOfMonth.toISOString().split("T")[0] };
+    }
+    return { start: startOfToday, end: startOfToday };
+  };
+
+  const dateRange = getDateRange();
+  const isInDateRange = (dateISO: string) => dateISO >= dateRange.start && dateISO <= dateRange.end;
+
+  const totalOrdersToday = useMemo(() => allOrders.filter((o) => isInDateRange(o.dateISO)).length, [allOrders, dateRange]);
+  const oneOffOrders     = useMemo(() => allOrders.filter((o) => o.type === "one-off" && isInDateRange(o.dateISO)).length, [allOrders, dateRange]);
   const standardMenuCount = useMemo(() => menus.filter((m) => m.isDefault).length, [menus]);
   const customMenuCount   = useMemo(() => menus.filter((m) => !m.isDefault).length, [menus]);
 
   const revenueToday = useMemo(
-    () => allOrders.filter((o) => daysSince(o.dateISO) === 0).reduce((sum, o) => sum + parseAmount(o.totalAmount), 0),
-    [allOrders]
+    () => allOrders.filter((o) => isInDateRange(o.dateISO)).reduce((sum, o) => sum + parseAmount(o.totalAmount), 0),
+    [allOrders, dateRange]
   );
 
   const topMealToday = useMemo(() => {
-    const orders = allOrders.filter((o) => daysSince(o.dateISO) === 0);
+    const orders = allOrders.filter((o) => isInDateRange(o.dateISO));
     const qtyByDish = new Map<string, number>();
     for (const o of orders) {
       for (const item of o.items) {
@@ -162,7 +189,7 @@ export default function DashboardPage() {
     if (!top) return null;
     const dish = dishes.find((d) => d.id === top[0]);
     return dish ? { dish, qty: top[1] } : null;
-  }, [allOrders, dishes]);
+  }, [allOrders, dishes, dateRange]);
 
   return (
     <div
@@ -178,12 +205,42 @@ export default function DashboardPage() {
         <p className="mt-2 text-[13px] font-normal" style={{ color: "rgba(248,227,150,0.5)" }}>
           {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </p>
+
+        {/* Date Filter */}
+        <div className="mt-4 flex gap-2">
+          {(["today", "week", "month"] as const).map((filter) => (
+            <motion.button
+              key={filter}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setDateFilter(filter)}
+              className="px-4 py-2 rounded-lg text-[12px] font-bold uppercase tracking-wider transition-all"
+              style={{
+                background: dateFilter === filter ? M.gold : M.surface,
+                color: dateFilter === filter ? "#000000" : M.gold,
+                border: `1px solid ${dateFilter === filter ? M.gold : M.border}`,
+              }}
+              onMouseEnter={(e) => {
+                if (dateFilter !== filter) {
+                  (e.currentTarget as HTMLElement).style.background = "rgba(248,227,150,0.1)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (dateFilter !== filter) {
+                  (e.currentTarget as HTMLElement).style.background = M.surface;
+                }
+              }}
+            >
+              {filter === "today" ? "Today" : filter === "week" ? "This Week" : "This Month"}
+            </motion.button>
+          ))}
+        </div>
       </motion.div>
 
       {/* ── 7-card stats grid (removed Top Selling Meals) ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCell
-          label="Total Orders"
+          label={`Total Orders (${dateFilter === "today" ? "Today" : dateFilter === "week" ? "This Week" : "This Month"})`}
           value={totalOrdersToday}
           delay={0}
           onClick={() => router.push("/dashboard/orders")}
