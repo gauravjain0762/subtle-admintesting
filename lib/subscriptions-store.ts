@@ -29,3 +29,9 @@ export function getSubscriptions(): SubscriptionSummary[] {
 export function getActiveWeeklySubscriptionsCount(): number {
   return SUBSCRIPTIONS.filter((s) => s.status === "active").length;
 }
+
+export function getActiveDayOffPlanCount(): number {
+  // Count of active one-day-off plan subscriptions
+  // Currently returns a fixed value; should be based on plan type when available
+  return 2;
+}
