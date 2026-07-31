@@ -219,9 +219,13 @@ export interface ApiPromoCode {
   value: number;
   label: string;
   description?: string;
+  oneTimeUse?: boolean;
+  firstTimeUserOnly?: boolean;
+  maxUses?: number;
+  usedBy?: string[];
   active: boolean;
   expiresAt?: string;
-  workspaceCodes: string[];
+  workspaceCodes?: string[];
   createdAt?: string;
   updatedAt?: string;
 }

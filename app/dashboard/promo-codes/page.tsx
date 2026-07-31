@@ -49,16 +49,24 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function validate(form: { code: string; label: string; description: string; value: string; expiresAt: string }) {
+function validate(form: { code: string; label: string; description: string; value: string; expiresAt: string; type: string; maxUses?: string }) {
   const e: Record<string, string> = {};
   if (!form.code.trim()) e.code = "Promo code is required";
 
   if (!form.label.trim()) e.label = "Promo name is required";
 
   const val = Number(form.value);
-  if (!form.value || Number.isNaN(val) || val <= 0 || val > 100) e.value = "Enter a value between 1 and 100";
+  const maxVal = form.type === "percentage" ? 100 : 999;
+  if (!form.value || Number.isNaN(val) || val <= 0 || val > maxVal) {
+    e.value = form.type === "percentage" ? "Enter a value between 1 and 100" : "Enter a valid amount";
+  }
 
   if (form.expiresAt && form.expiresAt <= todayISO()) e.expiresAt = "Expiry must be a future date";
+
+  if (form.maxUses) {
+    const maxUsesVal = Number(form.maxUses);
+    if (Number.isNaN(maxUsesVal) || maxUsesVal <= 0) e.maxUses = "Must be a positive number";
+  }
 
   return e;
 }
@@ -69,7 +77,11 @@ function PromoFormModal({
   const [code, setCode] = useState(initial?.code ?? "");
   const [label, setLabel] = useState(initial?.label ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [type, setType] = useState(initial?.type ?? "percentage");
   const [value, setValue] = useState(initial ? String(initial.value) : "");
+  const [oneTimeUse, setOneTimeUse] = useState(initial?.oneTimeUse ?? false);
+  const [firstTimeUserOnly, setFirstTimeUserOnly] = useState(initial?.firstTimeUserOnly ?? false);
+  const [maxUses, setMaxUses] = useState(initial?.maxUses ? String(initial.maxUses) : "");
   const [expiresAt, setExpiresAt] = useState(initial?.expiresAtISO ?? "");
   const [active, setActive] = useState(initial?.active ?? true);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -118,14 +130,18 @@ function PromoFormModal({
   };
 
   const handleSubmit = () => {
-    const e = validate({ code, label, description, value, expiresAt });
+    const e = validate({ code, label, description, value, expiresAt, type, maxUses });
     setErrors(e);
     if (Object.keys(e).length > 0) return;
     onSave({
       code: code.trim().toUpperCase(),
       label: label.trim(),
       description: description.trim(),
+      type: type as "percentage" | "fixed",
       value: Number(value),
+      oneTimeUse,
+      firstTimeUserOnly,
+      maxUses: maxUses ? Number(maxUses) : undefined,
       active,
       expiresAt: expiresAt || undefined,
     });
@@ -176,19 +192,52 @@ function PromoFormModal({
 
           <div>
             <label className="mb-1.5 block text-[11.5px] font-semibold" style={{ color: M.textMuted }}>
-              Discount % <span style={{ color: M.red }}>*</span>
+              Type <span style={{ color: M.red }}>*</span>
+            </label>
+            <select
+              value={type}
+              onChange={(e) => { setType(e.target.value as "percentage" | "fixed"); setErrors((p) => ({ ...p, value: "" })); }}
+              className="w-full rounded-xl px-4 py-2.5 text-[13px] outline-none transition-all"
+              style={fieldStyle(false)}
+            >
+              <option value="percentage">Percentage (%)</option>
+              <option value="fixed">Fixed Amount (£)</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <div>
+            <label className="mb-1.5 block text-[11.5px] font-semibold" style={{ color: M.textMuted }}>
+              Discount Value <span style={{ color: M.red }}>*</span>
             </label>
             <input
               type="number"
               min={1}
-              max={100}
+              max={type === "percentage" ? 100 : 999}
               value={value}
               onChange={(e) => { setValue(e.target.value); setErrors((p) => ({ ...p, value: "" })); }}
-              placeholder="e.g. 15"
+              placeholder={type === "percentage" ? "e.g. 15" : "e.g. 5"}
               className="w-full rounded-xl px-4 py-2.5 text-[13px] outline-none transition-all"
               style={fieldStyle(!!errors.value)}
             />
             {errors.value && <p className="mt-1 text-[11px]" style={{ color: M.red }}>{errors.value}</p>}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[11.5px] font-semibold" style={{ color: M.textMuted }}>
+              Max Uses (optional)
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={maxUses}
+              onChange={(e) => { setMaxUses(e.target.value); setErrors((p) => ({ ...p, maxUses: "" })); }}
+              placeholder="e.g. 50"
+              className="w-full rounded-xl px-4 py-2.5 text-[13px] outline-none transition-all"
+              style={fieldStyle(!!errors.maxUses)}
+            />
+            {errors.maxUses && <p className="mt-1 text-[11px]" style={{ color: M.red }}>{errors.maxUses}</p>}
           </div>
         </div>
 
@@ -246,6 +295,34 @@ function PromoFormModal({
               <span className="text-[12.5px] font-semibold" style={{ color: active ? M.gold : M.textMuted }}>
                 {active ? "Active" : "Inactive"}
               </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3 rounded-xl p-4" style={{ background: M.surface, border: `1px solid ${M.border}` }}>
+          <div className="flex items-center gap-3">
+            <SKToggle on={oneTimeUse} onChange={() => setOneTimeUse((v) => !v)} size="sm" color={M.gold} borderColor={M.gold} />
+            <div className="flex-1">
+              <label className="block text-[12px] font-semibold" style={{ color: M.white }}>
+                One-Time Use
+              </label>
+              <p className="text-[11px] mt-0.5" style={{ color: M.textMuted }}>
+                Customer can only use this code once
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t" style={{ borderColor: M.border }} />
+
+          <div className="flex items-center gap-3">
+            <SKToggle on={firstTimeUserOnly} onChange={() => setFirstTimeUserOnly((v) => !v)} size="sm" color={M.gold} borderColor={M.gold} />
+            <div className="flex-1">
+              <label className="block text-[12px] font-semibold" style={{ color: M.white }}>
+                First-Time Users Only
+              </label>
+              <p className="text-[11px] mt-0.5" style={{ color: M.textMuted }}>
+                Only new customers who haven't ordered before
+              </p>
             </div>
           </div>
         </div>

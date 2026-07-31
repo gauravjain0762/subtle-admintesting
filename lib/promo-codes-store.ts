@@ -12,7 +12,11 @@ export interface PromoCode {
   code: string;
   label: string;
   description: string;
+  type: "percentage" | "fixed";
   value: number;
+  oneTimeUse: boolean;
+  firstTimeUserOnly: boolean;
+  maxUses?: number;
   active: boolean;
   expiresAtISO: string;
   expiresAtDisplay: string;
@@ -22,7 +26,11 @@ export interface PromoCodeFormValues {
   code: string;
   label: string;
   description: string;
+  type: "percentage" | "fixed";
   value: number;
+  oneTimeUse: boolean;
+  firstTimeUserOnly: boolean;
+  maxUses?: number;
   active: boolean;
   expiresAt?: string;
 }
@@ -42,7 +50,11 @@ function mapPromoCode(p: ApiPromoCode): PromoCode {
     code: p.code,
     label: p.label,
     description: p.description ?? "",
+    type: p.type ?? "percentage",
     value: p.value,
+    oneTimeUse: p.oneTimeUse ?? false,
+    firstTimeUserOnly: p.firstTimeUserOnly ?? false,
+    maxUses: p.maxUses,
     active: p.active,
     expiresAtISO: p.expiresAt ? p.expiresAt.slice(0, 10) : "",
     expiresAtDisplay: displayDate(p.expiresAt),
@@ -52,10 +64,13 @@ function mapPromoCode(p: ApiPromoCode): PromoCode {
 function toInput(values: PromoCodeFormValues): PromoCodeInput {
   return {
     code: values.code,
-    type: "percentage",
+    type: values.type,
     value: values.value,
     label: values.label,
     description: values.description,
+    oneTimeUse: values.oneTimeUse,
+    firstTimeUserOnly: values.firstTimeUserOnly,
+    maxUses: values.maxUses,
     active: values.active,
     expiresAt: values.expiresAt || undefined,
     workspaceCodes: [],

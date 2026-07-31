@@ -3,13 +3,16 @@ import type { ApiPromoCode, ApiPromoCodeListResponse, ApiPromoCodeResponse } fro
 
 export interface PromoCodeInput {
   code: string;
-  type: "percentage";
+  type: "percentage" | "fixed";
   value: number;
   label: string;
   description: string;
+  oneTimeUse?: boolean;
+  firstTimeUserOnly?: boolean;
+  maxUses?: number;
   active: boolean;
   expiresAt?: string;
-  workspaceCodes: string[];
+  workspaceCodes?: string[];
 }
 
 export async function fetchPromoCodes(): Promise<ApiPromoCode[]> {
