@@ -243,10 +243,7 @@ export default function OrdersPage() {
   useEffect(() => {
     setLoading(true);
     const companyId = companyFilter === ALL_COMPANIES ? undefined : companies.find((c) => c.name === companyFilter)?.id;
-    const fetchLimit = PAGE_SIZE * 3;
-    getOrders({
-      page: currentPage,
-      limit: fetchLimit,
+    getAllOrders({
       status: statusFilter === "All" ? undefined : (statusFilter.toLowerCase() as OrderStatus),
       type: typeFilter === "All Types" ? undefined : (typeFilter === "One-time" ? "one-time" : typeFilter === "One-Day Off" ? "one-off" : typeFilter.toLowerCase() as OrderType),
       workspaceId: companyId,
@@ -255,11 +252,13 @@ export default function OrdersPage() {
       endDate: dayFilter === "Custom Date" ? (customEndDate || customStartDate) : undefined,
       search: debouncedSearch || undefined,
     })
-      .then((res) => {
-        const grouped = groupSubscriptionOrders(res.orders);
-        setOrders(grouped.slice(0, PAGE_SIZE) as Order[]);
-        setTotal(res.total);
-        setTotalPages(Math.ceil(res.total / PAGE_SIZE));
+      .then((allOrders) => {
+        const grouped = groupSubscriptionOrders(allOrders);
+        const start = (currentPage - 1) * PAGE_SIZE;
+        const paginatedOrders = grouped.slice(start, start + PAGE_SIZE);
+        setOrders(paginatedOrders as Order[]);
+        setTotal(allOrders.length);
+        setTotalPages(Math.ceil(grouped.length / PAGE_SIZE));
       })
       .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to load orders"))
       .finally(() => setLoading(false));
