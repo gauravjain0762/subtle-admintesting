@@ -12,7 +12,7 @@ export interface OrderLineItem {
 }
 
 export type OrderStatus = "new" | "delivered" | "cancelled";
-export type OrderType = "weekly" | "one-off";
+export type OrderType = "weekly" | "one-off" | "one-time";
 export type PaymentMethod = "card" | "apple_pay" | "google_pay";
 
 export interface Order {
@@ -77,7 +77,7 @@ function mapOrder(o: ApiOrder): Order {
     })),
     totalAmount: formatAmount(o.totalAmount),
     status: o.status,
-    type: o.subscriptionType,
+    type: o.planType,
     paymentMethod: o.paymentMethod,
     orderDateISO: orderISO,
     orderDateDisplay: displayDate(o.orderDate),
@@ -152,6 +152,7 @@ export const STATUS_CFG: Record<OrderStatus, { label: string; color: string; bg:
 export const TYPE_CFG: Record<OrderType, { color: string; bg: string }> = {
   weekly:    { color: "#7a5a00", bg: "#fffce0" },
   "one-off": { color: "#6b6b5a", bg: "#f0e9d6" },
+  "one-time": { color: "#5a7a5a", bg: "#e8f5e9" },
 };
 
 export const PAYMENT_CFG: Record<PaymentMethod, { label: string }> = {

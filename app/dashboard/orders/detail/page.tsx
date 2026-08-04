@@ -28,7 +28,7 @@ const M = {
 };
 
 const STATUS_COLOR: Record<OrderStatus, string> = { new: M.amber, delivered: M.green, cancelled: M.red };
-const TYPE_LABEL: Record<string, string> = { weekly: "Weekly Subscription", "one-off": "One-time Order" };
+const TYPE_LABEL: Record<string, string> = { weekly: "Weekly Subscription", "one-off": "One-Day Off Subscription", "one-time": "One-time Order" };
 
 const fade = (delay = 0) => ({
   initial: { opacity: 0, y: 18 },

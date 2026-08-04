@@ -159,7 +159,7 @@ export interface ApiWeeklyMenuResponse {
 }
 
 export type ApiOrderStatus = "new" | "delivered" | "cancelled";
-export type ApiSubscriptionType = "weekly" | "one-off";
+export type ApiSubscriptionType = "weekly" | "one-off" | "one-time";
 export type ApiPaymentMethod = "card" | "apple_pay" | "google_pay";
 
 export interface ApiOrderItem {
@@ -183,7 +183,7 @@ export interface ApiOrder {
   /** Observed live as a bare number (e.g. 13.25), not the pre-formatted "£13.25" string the original spec assumed. */
   totalAmount: number | string;
   status: ApiOrderStatus;
-  subscriptionType: ApiSubscriptionType;
+  planType: ApiSubscriptionType;
   paymentMethod: ApiPaymentMethod;
   orderDate: string;
   deliveryDate: string;
