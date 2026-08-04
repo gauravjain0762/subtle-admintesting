@@ -243,9 +243,10 @@ export default function OrdersPage() {
   useEffect(() => {
     setLoading(true);
     const companyId = companyFilter === ALL_COMPANIES ? undefined : companies.find((c) => c.name === companyFilter)?.id;
+    const fetchLimit = PAGE_SIZE * 3;
     getOrders({
       page: currentPage,
-      limit: PAGE_SIZE,
+      limit: fetchLimit,
       status: statusFilter === "All" ? undefined : (statusFilter.toLowerCase() as OrderStatus),
       type: typeFilter === "All Types" ? undefined : (typeFilter === "One-time" ? "one-time" : typeFilter === "One-Day Off" ? "one-off" : typeFilter.toLowerCase() as OrderType),
       workspaceId: companyId,
@@ -254,7 +255,12 @@ export default function OrdersPage() {
       endDate: dayFilter === "Custom Date" ? (customEndDate || customStartDate) : undefined,
       search: debouncedSearch || undefined,
     })
-      .then((res) => { setOrders(res.orders); setTotal(res.total); setTotalPages(res.totalPages); })
+      .then((res) => {
+        const grouped = groupSubscriptionOrders(res.orders);
+        setOrders(grouped.slice(0, PAGE_SIZE) as Order[]);
+        setTotal(res.total);
+        setTotalPages(Math.ceil(res.total / PAGE_SIZE));
+      })
       .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed to load orders"))
       .finally(() => setLoading(false));
   }, [currentPage, statusFilter, typeFilter, companyFilter, dayFilter, customStartDate, customEndDate, debouncedSearch, companies, refreshKey]);
@@ -517,10 +523,10 @@ export default function OrdersPage() {
         </div>
 
         <div>
-          {/* Group subscription orders */}
+          {/* Display grouped orders */}
           {orders.length > 0 && (
             <div className="space-y-1">
-              {groupSubscriptionOrders(orders).map((order, i) => (
+              {(orders as any[]).map((order, i) => (
                 <GroupedOrderRow
                   key={"deliveries" in order ? order.subscriptionId : order.id}
                   order={order}
