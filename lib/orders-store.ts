@@ -38,6 +38,30 @@ export interface Order {
   dateDisplay: string;
 }
 
+export interface GroupedSubscriptionOrder {
+  subscriptionId: string;
+  orderNumber: string;
+  customerName: string;
+  customerInitials: string;
+  companyId?: string;
+  companyCode?: string;
+  companyName?: string;
+  totalAmount: string;
+  status: OrderStatus;
+  type: Exclude<OrderType, "one-time">;
+  paymentMethod: PaymentMethod;
+  items: OrderLineItem[];
+  preferredTime?: string;
+  deliveryCount: number;
+  deliveries: Array<{
+    date: string;
+    dateDisplay: string;
+    orderId: string;
+    orderNumber: string;
+  }>;
+  isExpanded?: boolean;
+}
+
 export function deriveInitials(name: string): string {
   return name.trim().split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "?";
 }
@@ -137,6 +161,56 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
 
 export async function bulkUpdateStatus(ids: string[], status: OrderStatus): Promise<number> {
   return bulkSetOrderStatus(ids, status);
+}
+
+export function groupSubscriptionOrders(orders: Order[]): (Order | GroupedSubscriptionOrder)[] {
+  const subscriptionOrders = orders.filter((o) => o.type === "weekly" || o.type === "one-off");
+  const oneTimeOrders = orders.filter((o) => o.type === "one-time");
+
+  const groupMap = new Map<string, Order[]>();
+
+  for (const order of subscriptionOrders) {
+    const key = `${order.customerName}|${order.type}|${order.companyId || ""}`;
+    if (!groupMap.has(key)) groupMap.set(key, []);
+    groupMap.get(key)!.push(order);
+  }
+
+  const grouped: (Order | GroupedSubscriptionOrder)[] = [];
+
+  for (const orderGroup of groupMap.values()) {
+    if (orderGroup.length === 0) continue;
+
+    const first = orderGroup[0];
+    const deliveries = orderGroup
+      .sort((a, b) => a.deliveryDateISO.localeCompare(b.deliveryDateISO))
+      .map((o) => ({
+        date: o.deliveryDateISO,
+        dateDisplay: o.deliveryDateDisplay,
+        orderId: o.id,
+        orderNumber: o.orderNumber,
+      }));
+
+    grouped.push({
+      subscriptionId: first.id,
+      orderNumber: first.orderNumber,
+      customerName: first.customerName,
+      customerInitials: first.customerInitials,
+      companyId: first.companyId,
+      companyCode: first.companyCode,
+      companyName: first.companyName,
+      totalAmount: first.totalAmount,
+      status: first.status,
+      type: first.type as Exclude<OrderType, "one-time">,
+      paymentMethod: first.paymentMethod,
+      items: first.items,
+      preferredTime: first.preferredTime,
+      deliveryCount: orderGroup.length,
+      deliveries,
+      isExpanded: false,
+    });
+  }
+
+  return [...grouped, ...oneTimeOrders];
 }
 
 export function parseAmount(amount: string): number {

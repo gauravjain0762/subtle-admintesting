@@ -7,12 +7,13 @@ import { Search, Download, ChevronLeft, ChevronRight, ChevronDown, Eye, X, Clipb
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
-  getOrders, getAllOrders, bulkUpdateStatus, STATUS_CFG,
+  getOrders, getAllOrders, bulkUpdateStatus, groupSubscriptionOrders, STATUS_CFG,
   type Order, type OrderStatus, type OrderType,
 } from "@/lib/orders-store";
 import { getCompanies, type Company } from "@/lib/companies-store";
 import { ApiError } from "@/lib/api/client";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
+import { GroupedOrderRow } from "@/components/orders/grouped-order-row";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -515,100 +516,22 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto overflow-y-hidden">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr style={{ background: M.surface }}>
-                {[...(selectMode ? [""] : []), "Order ID", "Customer", "Company", "Dish(es)", "Type", "Amount", "Status", "Date", ""].map((h, i) => (
-                  <th
-                    key={i}
-                    className="whitespace-nowrap px-5 py-3 text-left text-[8.5px] font-bold uppercase tracking-[0.12em]"
-                    style={{ color: M.goldMuted, borderBottom: `1px solid ${M.border}` }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order, i) => {
-                const label = order.companyCode
-                  ? `${order.customerInitials} | ${order.companyCode}`
-                  : order.customerInitials;
-                return (
-                  <motion.tr
-                    key={order.id}
-                    custom={i}
-                    variants={rowVariants}
-                    initial="hidden"
-                    animate="show"
-                    className="cursor-pointer transition-colors"
-                    style={{ borderBottom: i < orders.length - 1 ? `1px solid ${M.borderFaint}` : "none" }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = M.surface; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
-                  >
-                    {selectMode && (
-                      <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(order.id)}
-                          onChange={() => toggleSelected(order.id)}
-                          className="h-4 w-4 cursor-pointer accent-[#f8e396]"
-                        />
-                      </td>
-                    )}
-                    <td className="px-5 py-4">
-                      <span className="text-[12px] font-bold" style={{ color: M.gold }}>{order.orderNumber}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="text-[12.5px] font-semibold" style={{ color: M.white }}>{order.customerName}</span>
-                      <div className="mt-1">
-                        <span
-                          className="rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wider"
-                          style={{ background: M.surface, color: M.textMuted, border: `1px solid ${M.border}` }}
-                        >
-                          {label}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      {order.companyName ? (
-                        <span className="text-[12.5px] font-medium" style={{ color: "#cccccc" }}>{order.companyName}</span>
-                      ) : (
-                        <span className="text-[12px] italic" style={{ color: M.textFaint }}>Individual</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4 max-w-[220px]">
-                      <span className="text-[12.5px] line-clamp-1" style={{ color: M.textMuted }}>{itemsLabel(order)}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <TypeBadge type={order.type} />
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="text-[13px] font-bold" style={{ color: M.gold }}>{order.totalAmount}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <StatusBadge status={order.status} />
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className="text-[12px]" style={{ color: M.textMuted }}>{order.deliveryDateDisplay}</span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <button
-                        onClick={() => router.push(`/dashboard/orders/detail?id=${order.id}`)}
-                        className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
-                        style={{ border: `1px solid ${M.border}`, color: M.textMuted }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = M.gold; (e.currentTarget as HTMLElement).style.borderColor = M.goldFaint; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = M.textMuted; (e.currentTarget as HTMLElement).style.borderColor = M.border; }}
-                      >
-                        <Eye size={13} />
-                      </button>
-                    </td>
-                  </motion.tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div>
+          {/* Group subscription orders */}
+          {orders.length > 0 && (
+            <div className="space-y-1">
+              {groupSubscriptionOrders(orders).map((order, i) => (
+                <GroupedOrderRow
+                  key={"deliveries" in order ? order.subscriptionId : order.id}
+                  order={order}
+                  onViewDetails={(orderId) => router.push(`/dashboard/orders/detail?id=${orderId}`)}
+                  selectMode={selectMode}
+                  isSelected={"deliveries" in order ? selectedIds.has(order.subscriptionId) : selectedIds.has(order.id)}
+                  onToggleSelect={() => toggleSelected("deliveries" in order ? order.subscriptionId : order.id)}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {!loading && orders.length === 0 && (
