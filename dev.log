@@ -6,6 +6,14 @@
 ▲ Next.js 16.2.9 (Turbopack)
 - Local:         http://localhost:3002
 - Network:       http://192.168.1.14:3002
-✓ Ready in 2.8s
+✓ Ready in 2.0s
+⚠ Slow filesystem detected. The benchmark took 322ms. If F:\company\subtle kitchen\updated\subtile-kitchen-admin\.next/dev is a network drive, consider moving it to a local folder.
+See more: https://nextjs.org/docs/app/guides/local-development
 
+○ Compiling / ...
+ GET / 307 in 5.7s (next.js: 5.4s, application-code: 347ms)
+ GET /dashboard/orders 200 in 2.5s (next.js: 2.2s, application-code: 286ms)
+ GET /icon?83ec57592011ddb3 200 in 1600ms (next.js: 866ms, application-code: 733ms)
+ GET /login 200 in 1555ms (next.js: 1473ms, application-code: 82ms)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior (file://F:/company/subtle kitchen/updated/subtile-kitchen-admin/.next/dev/static/chunks/node_modules_next_dist_1ybzpk2._.js:2477:13)
 [?25h

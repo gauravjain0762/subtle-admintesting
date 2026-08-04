@@ -13,6 +13,7 @@ const M = {
   textMuted: "#888888",
   textFaint: "#444444",
   white: "#ffffff",
+  amber: "#f5c451",
 };
 
 interface GroupedOrderRowProps {
@@ -52,7 +53,7 @@ export function GroupedOrderRow({
             className="h-4 w-4 cursor-pointer"
           />
         )}
-        <div className="flex-1 grid grid-cols-6 gap-3 items-center">
+        <div className="flex-1 grid grid-cols-8 gap-3 items-center">
           <span className="text-[12px] font-bold" style={{ color: M.gold }}>
             {singleOrder!.orderNumber}
           </span>
@@ -66,10 +67,9 @@ export function GroupedOrderRow({
             {singleOrder!.items.map((i) => i.dishName).join(", ")}
           </span>
           <span
-            className="text-[11px] font-semibold rounded px-2 py-1 text-center"
+            className="text-[11px] font-semibold"
             style={{
-              color: TYPE_CFG[singleOrder!.type]?.color || M.white,
-              background: TYPE_CFG[singleOrder!.type]?.bg,
+              color: M.textMuted,
             }}
           >
             {singleOrder!.type}
@@ -77,16 +77,26 @@ export function GroupedOrderRow({
           <span className="text-[12px] font-semibold" style={{ color: M.gold }}>
             {singleOrder!.totalAmount}
           </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onViewDetails(singleOrder!.id)}
-            className="p-1 rounded hover:opacity-70 transition-opacity"
-            title="View details"
+          <span
+            className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-semibold border w-fit"
+            style={{
+              color: singleOrder!.status === "new" ? "#f5c451" : singleOrder!.status === "delivered" ? "#22c55e" : "#ff6b6b",
+              borderColor: singleOrder!.status === "new" ? "#f5c451" : singleOrder!.status === "delivered" ? "#22c55e" : "#ff6b6b",
+            }}
           >
-            <Eye size={16} style={{ color: M.textMuted }} />
-          </button>
+            {STATUS_CFG[singleOrder!.status]?.label}
+          </span>
+          <span className="text-[12px]" style={{ color: M.textMuted }}>
+            {singleOrder!.deliveryDateDisplay}
+          </span>
         </div>
+        <button
+          onClick={() => onViewDetails(singleOrder!.id)}
+          className="p-1 rounded hover:opacity-70 transition-opacity ml-2"
+          title="View details"
+        >
+          <Eye size={16} style={{ color: M.textMuted }} />
+        </button>
       </motion.div>
     );
   }
@@ -126,7 +136,7 @@ export function GroupedOrderRow({
             />
           </button>
 
-          <div className="flex-1 grid grid-cols-6 gap-3 items-center">
+          <div className="flex-1 grid grid-cols-8 gap-3 items-center">
             <span className="text-[12px] font-bold" style={{ color: M.gold }}>
               {grouped.orderNumber}
             </span>
@@ -140,10 +150,9 @@ export function GroupedOrderRow({
               {grouped.items.map((i) => i.dishName).join(", ")}
             </span>
             <span
-              className="text-[11px] font-semibold rounded px-2 py-1 text-center"
+              className="text-[11px] font-semibold"
               style={{
-                color: TYPE_CFG[grouped.type]?.color || M.white,
-                background: TYPE_CFG[grouped.type]?.bg,
+                color: M.textMuted,
               }}
             >
               {grouped.type}
@@ -151,20 +160,28 @@ export function GroupedOrderRow({
             <span className="text-[12px] font-semibold" style={{ color: M.gold }}>
               {grouped.totalAmount} × {grouped.deliveryCount}
             </span>
-          </div>
-
-          <div className="flex items-center gap-2">
             <span
-              className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-semibold"
+              className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-semibold border w-fit"
               style={{
-                color: grouped.status === "new" ? "#f5c451" : grouped.status === "delivered" ? "#22c55e" : "#ff6b6b",
-                background: cfg?.bg || M.surface,
+                color: grouped.status === "new" ? M.amber : grouped.status === "delivered" ? "#22c55e" : "#ff6b6b",
+                borderColor: grouped.status === "new" ? M.amber : grouped.status === "delivered" ? "#22c55e" : "#ff6b6b",
               }}
             >
               {cfg?.icon && <cfg.icon size={12} />}
               {cfg?.label || grouped.status}
             </span>
+            <span className="text-[12px]" style={{ color: M.textMuted }}>
+              {grouped.deliveries[0]?.dateDisplay || "—"}
+            </span>
           </div>
+
+          <button
+            onClick={() => onViewDetails(grouped.deliveries[0]?.orderId || grouped.subscriptionId)}
+            className="p-1 rounded hover:opacity-70 transition-opacity ml-2"
+            title="View details"
+          >
+            <Eye size={16} style={{ color: M.textMuted }} />
+          </button>
         </div>
 
         <AnimatePresence>
