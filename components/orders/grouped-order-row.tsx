@@ -32,6 +32,7 @@ export function GroupedOrderRow({
   onToggleSelect,
 }: GroupedOrderRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedDeliveries, setSelectedDeliveries] = useState<Set<string>>(new Set());
 
   const isGrouped = "deliveries" in order;
   const singleOrder = !isGrouped ? (order as Order) : null;
@@ -200,9 +201,26 @@ export function GroupedOrderRow({
               <div className="space-y-1 max-h-64 overflow-y-auto">
                 {grouped.deliveries.map((delivery, i) => (
                   <div key={i} className="flex items-center justify-between rounded px-3 py-2" style={{ background: M.surface }}>
-                    <span className="text-[11px]" style={{ color: M.white }}>
-                      {delivery.dateDisplay}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedDeliveries.has(delivery.orderId)}
+                        onChange={(e) => {
+                          const newSelected = new Set(selectedDeliveries);
+                          if (e.target.checked) {
+                            newSelected.add(delivery.orderId);
+                          } else {
+                            newSelected.delete(delivery.orderId);
+                          }
+                          setSelectedDeliveries(newSelected);
+                        }}
+                        className="w-4 h-4 cursor-pointer"
+                        title="Select this delivery to mark as delivered"
+                      />
+                      <span className="text-[11px]" style={{ color: M.white }}>
+                        {delivery.dateDisplay}
+                      </span>
+                    </div>
                     <button
                       onClick={() => onViewDetails(delivery.orderId)}
                       className="flex items-center gap-2 text-[10px] font-semibold rounded px-2 py-1 transition-opacity hover:opacity-70"
