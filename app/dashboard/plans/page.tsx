@@ -458,13 +458,13 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
-          {/* Plan Type */}
+          {/* Subscription Type */}
           <div>
             <label className="mb-3 block text-[11px] font-bold" style={{ color: M.textMuted }}>
-              Plan Type
+              Subscription Type
             </label>
             <div className="flex gap-3">
-              {(["weekly", "one-off", "one-time-order"] as const).map((type) => (
+              {(["weekly", "one-off"] as const).map((type) => (
                 <label key={type} className="flex items-center gap-2">
                   <input
                     type="radio"
@@ -475,7 +475,7 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
                     className="h-4 w-4"
                   />
                   <span className="text-[12px]" style={{ color: M.white }}>
-                    {type === "weekly" ? "Weekly" : type === "one-off" ? "One-Day Off" : "One-Time Order"}
+                    {type === "weekly" ? "Weekly" : "One-Day Off"}
                   </span>
                 </label>
               ))}
@@ -727,10 +727,10 @@ function EditPlanModal({ plan, onClose, onSave }: { plan: PlanType; onClose: () 
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
-          {/* Plan Type (Read-only) */}
+          {/* Subscription Type (Read-only) */}
           <div>
             <label className="mb-1.5 block text-[11px] font-bold" style={{ color: M.textMuted }}>
-              Plan Type
+              Subscription Type
             </label>
             <div
               className="w-full rounded-lg px-4 py-2.5 text-[13px]"
