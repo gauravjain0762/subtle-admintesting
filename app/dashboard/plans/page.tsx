@@ -33,7 +33,7 @@ const M = {
 export default function PlansPage() {
   const [plans, setPlans] = useState<PlanType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"all" | "weekly" | "one-day-off" | "one-time-order">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "weekly" | "one-day-off">("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanType | null>(null);
   const [subscribersData, setSubscribersData] = useState<SubscribersResponse | null>(null);
@@ -74,7 +74,6 @@ export default function PlansPage() {
     if (activeTab === "all") return true;
     if (activeTab === "weekly") return p.type === "weekly";
     if (activeTab === "one-day-off") return p.type === "one-off";
-    if (activeTab === "one-time-order") return p.type === "one-time-order";
     return false;
   });
 
@@ -122,7 +121,7 @@ export default function PlansPage() {
         className="mb-6 flex w-fit overflow-hidden rounded-lg border"
         style={{ borderColor: M.goldFaint }}
       >
-        {(["all", "weekly", "one-day-off", "one-time-order"] as const).map((tab, i) => (
+        {(["all", "weekly", "one-day-off"] as const).map((tab, i) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -130,7 +129,7 @@ export default function PlansPage() {
             style={{
               background: activeTab === tab ? M.gold : "transparent",
               color: activeTab === tab ? "#000000" : M.gold,
-              borderRight: i < 3 ? `1px solid rgba(248,227,150,0.2)` : "none",
+              borderRight: i < 2 ? `1px solid rgba(248,227,150,0.2)` : "none",
             }}
             onMouseEnter={(e) => {
               if (activeTab !== tab) (e.currentTarget as HTMLElement).style.background = "rgba(248,227,150,0.08)";
@@ -139,7 +138,7 @@ export default function PlansPage() {
               if (activeTab !== tab) (e.currentTarget as HTMLElement).style.background = "transparent";
             }}
           >
-            {tab === "all" ? "All Plans" : tab === "weekly" ? "Weekly Plan" : tab === "one-day-off" ? "One-Day Off" : "One-Time Order"}
+            {tab === "all" ? "All Plans" : tab === "weekly" ? "Weekly Plan" : "One-Day Off"}
           </button>
         ))}
       </motion.div>
@@ -458,30 +457,6 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
-          {/* Subscription Type */}
-          <div>
-            <label className="mb-3 block text-[11px] font-bold" style={{ color: M.textMuted }}>
-              Subscription Type
-            </label>
-            <div className="flex gap-3">
-              {(["weekly", "one-off"] as const).map((type) => (
-                <label key={type} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="planType"
-                    value={type}
-                    checked={planType === type}
-                    onChange={() => setPlanType(type)}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-[12px]" style={{ color: M.white }}>
-                    {type === "weekly" ? "Weekly" : "One-Day Off"}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
           {/* Plan Name */}
           <div>
             <label className="mb-1 block text-[11px] font-bold" style={{ color: M.textMuted }}>
@@ -625,6 +600,30 @@ function CreatePlanModal({ onClose, onSave }: { onClose: () => void; onSave: () 
               </div>
             </div>
           )}
+
+          {/* Subscription Type */}
+          <div>
+            <label className="mb-3 block text-[11px] font-bold" style={{ color: M.textMuted }}>
+              Subscription Type
+            </label>
+            <div className="flex gap-3">
+              {(["weekly", "one-off"] as const).map((type) => (
+                <label key={type} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="planType"
+                    value={type}
+                    checked={planType === type}
+                    onChange={() => setPlanType(type)}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-[12px]" style={{ color: M.white }}>
+                    {type === "weekly" ? "Weekly" : "One-Day Off"}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="flex gap-3 border-t p-6" style={{ borderColor: M.border }}>
