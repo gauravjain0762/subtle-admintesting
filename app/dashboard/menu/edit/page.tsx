@@ -235,7 +235,7 @@ function EditDishContent() {
     try {
       await updateDish(dish.id, {
         name:        form.name.trim(),
-        price:       parseFloat(form.price).toFixed(2),
+        price:       Math.round(parseFloat(form.price)),
         nutrition:   form.nutrition.filter((n) => n.name.trim()),
         category:    form.category,
         allergens:   form.allergens,
@@ -336,8 +336,9 @@ function EditDishContent() {
               <Field label="Price (£)" required error={errors.price}>
                 <Input
                   value={form.price}
-                  placeholder="8.50"
+                  placeholder="8"
                   type="number"
+                  step="1"
                   onChange={(v) => { set("price", v); setErrors((e) => ({ ...e, price: "" })); }}
                   error={!!errors.price}
                 />
