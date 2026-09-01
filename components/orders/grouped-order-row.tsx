@@ -56,7 +56,7 @@ export function GroupedOrderRow({
             className="h-4 w-4 cursor-pointer"
           />
         )}
-        <div className="flex-1 grid grid-cols-8 gap-3 items-center">
+        <div className="flex-1 grid grid-cols-7 gap-3 items-center">
           <span className="text-[12px] font-bold" style={{ color: M.gold }}>
             {singleOrder!.orderNumber}
           </span>
@@ -76,9 +76,6 @@ export function GroupedOrderRow({
             }}
           >
             {singleOrder!.type}
-          </span>
-          <span className="text-[12px] font-semibold" style={{ color: M.gold }}>
-            {singleOrder!.totalAmount}
           </span>
           <span
             className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-semibold border w-fit"
@@ -139,7 +136,7 @@ export function GroupedOrderRow({
             />
           </button>
 
-          <div className="flex-1 grid grid-cols-8 gap-3 items-center">
+          <div className="flex-1 grid grid-cols-7 gap-3 items-center">
             <span className="text-[12px] font-bold" style={{ color: M.gold }}>
               {grouped.orderNumber}
             </span>
@@ -159,9 +156,6 @@ export function GroupedOrderRow({
               }}
             >
               {grouped.type}
-            </span>
-            <span className="text-[12px] font-semibold" style={{ color: M.gold }}>
-              {grouped.totalAmount}
             </span>
             <span
               className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-semibold border w-fit"
