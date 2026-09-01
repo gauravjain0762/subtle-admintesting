@@ -64,6 +64,7 @@ function OrderDetailContent() {
   const id = searchParams.get("id") ?? "";
 
   const [order, setOrder] = useState<Order | null>(null);
+  const [relatedOrders, setRelatedOrders] = useState<Order[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
   const [dishImages, setDishImages] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState(false);
@@ -77,6 +78,15 @@ function OrderDetailContent() {
         setOrder(found);
         if (found.companyId) {
           getCompanies().then((list) => setCompany(list.find((c) => c.id === found.companyId) ?? null)).catch(() => {});
+        }
+        if (found.type === "weekly" || found.type === "one-off") {
+          const allOrders = JSON.parse(localStorage.getItem("orders") || "[]") as Order[];
+          const related = allOrders.filter((o) =>
+            o.customerName === found.customerName &&
+            o.type === found.type &&
+            o.workspaceId === found.workspaceId
+          ).sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
+          setRelatedOrders(related.length > 0 ? related : [found]);
         }
       })
       .catch((err) => {
@@ -152,35 +162,39 @@ function OrderDetailContent() {
       {/* Items */}
       <motion.div {...fade(0.1)} className="rounded-xl p-6" style={{ background: M.panel, border: `1px solid ${M.border}` }}>
         <h2 className="mb-5 text-[13px] font-bold" style={{ color: M.white }}>Items &amp; Quantity</h2>
-        <div className="space-y-2">
-          {order.items.map((it, i) => {
-            const img = dishImages[it.dishId];
-            return (
-              <div key={i} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: M.surface }}>
-                <div className="flex items-center gap-3">
+        <div className="space-y-1">
+          {(relatedOrders.length > 0 ? relatedOrders : [order]).flatMap((o) =>
+            o.items.map((it, i) => {
+              const img = dishImages[it.dishId];
+              return (
+                <div key={`${o.id}-${i}`} className="flex items-center gap-3 rounded-lg px-4 py-2" style={{ background: M.surface }}>
                   {img ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={img} alt={it.dishName} className="h-11 w-11 shrink-0 rounded-lg object-cover" style={{ border: `1px solid ${M.border}` }} />
+                    <img src={img} alt={it.dishName} className="h-8 w-8 shrink-0 rounded object-cover" style={{ border: `1px solid ${M.border}` }} />
                   ) : (
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg" style={{ background: M.panel, border: `1px solid ${M.border}` }}>
-                      <Package size={16} style={{ color: M.goldMuted }} />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded" style={{ background: M.panel, border: `1px solid ${M.border}` }}>
+                      <Package size={14} style={{ color: M.goldMuted }} />
                     </div>
                   )}
-                  <div>
-                    <p className="text-[13px] font-semibold" style={{ color: M.white }}>{it.dishName}</p>
-                    <p className="text-[11px]" style={{ color: M.textMuted }}>
-                      Portion: {it.portion ?? "Standard"} · Add-ons: {it.addOns?.length ? it.addOns.join(", ") : "None"} · Qty: {it.quantity}
-                    </p>
-                  </div>
+                  <span className="text-[12px] font-semibold min-w-fit" style={{ color: M.white }}>{it.dishName}</span>
+                  <span className="text-[11px]" style={{ color: M.textMuted }}>•</span>
+                  <span className="text-[11px]" style={{ color: M.textMuted }}>{o.deliveryDateDisplay || o.deliveryDate}</span>
+                  <span className="text-[11px]" style={{ color: M.textMuted }}>•</span>
+                  <span className="text-[11px]" style={{ color: M.textMuted }}>Qty: {it.quantity}</span>
+                  <span className="text-[11px]" style={{ color: M.textMuted }}>•</span>
+                  <span className="text-[12px] font-bold ml-auto" style={{ color: M.gold }}>£{it.unitPrice} × {it.quantity}</span>
                 </div>
-                <p className="text-[13px] font-bold" style={{ color: M.gold }}>£{it.unitPrice} × {it.quantity}</p>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
         <div className="mt-4 flex items-center justify-between border-t pt-4" style={{ borderColor: M.border }}>
           <span className="text-[12px] font-semibold" style={{ color: M.textMuted }}>Total Amount</span>
-          <span className="text-[18px] font-bold" style={{ color: M.gold }}>{order.totalAmount}</span>
+          <span className="text-[18px] font-bold" style={{ color: M.gold }}>
+            £{(relatedOrders.length > 0 ? relatedOrders : [order])
+              .reduce((sum, o) => sum + (typeof o.totalAmount === "string" ? parseFloat(o.totalAmount) : o.totalAmount), 0)
+              .toFixed(2)}
+          </span>
         </div>
       </motion.div>
 

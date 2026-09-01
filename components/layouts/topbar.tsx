@@ -67,6 +67,9 @@ export function Topbar({ onMobileMenuOpen, sidebarWidth = 264 }: TopbarProps) {
       setNotifications(res.notifications);
       setUnreadCount(res.unreadCount);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        return;
+      }
       console.error("Failed to fetch notifications:", err);
     }
   };
