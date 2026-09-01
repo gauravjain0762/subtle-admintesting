@@ -50,7 +50,8 @@ export async function getNotifications(
   if (type) params.append("type", type);
 
   const res = await apiFetch<NotificationsResponse>(
-    `/api/admin/notifications?${params.toString()}`
+    `/api/admin/notifications?${params.toString()}`,
+    { dontClearTokenOn401: true }
   );
   return res;
 }
