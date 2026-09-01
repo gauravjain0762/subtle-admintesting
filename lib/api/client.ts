@@ -30,6 +30,8 @@ interface ApiFetchOptions extends Omit<RequestInit, "body"> {
   /** Attach the stored bearer token. Defaults to true — pass false for the login call itself. */
   auth?: boolean;
   body?: unknown;
+  /** Don't clear token on 401 (useful for non-critical endpoints like notifications). */
+  dontClearTokenOn401?: boolean;
 }
 
 /**
@@ -38,7 +40,7 @@ interface ApiFetchOptions extends Omit<RequestInit, "body"> {
  * `{ success: boolean, ... }` envelope this API returns.
  */
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  const { auth = true, body, headers, ...rest } = options;
+  const { auth = true, body, headers, dontClearTokenOn401 = false, ...rest } = options;
 
   // FormData sets its own multipart boundary in the Content-Type header — never override it.
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
@@ -67,7 +69,9 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   const data = await res.json().catch(() => null);
 
   if (res.status === 401) {
-    clearToken();
+    if (!dontClearTokenOn401) {
+      clearToken();
+    }
     throw new ApiError((data && (data.error || data.message)) || "Session expired — please sign in again.", 401);
   }
 
