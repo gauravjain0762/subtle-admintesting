@@ -71,6 +71,7 @@ export interface ApiWorkspace {
   lastName?: string;
   email?: string;
   phone?: string;
+  countryCode?: string;
   totalUsers: number;
   totalOrders: number;
   createdAt: string;
