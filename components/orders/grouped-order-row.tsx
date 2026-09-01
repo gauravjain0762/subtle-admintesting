@@ -161,7 +161,7 @@ export function GroupedOrderRow({
               {grouped.type}
             </span>
             <span className="text-[12px] font-semibold" style={{ color: M.gold }}>
-              {grouped.totalAmount} × {grouped.deliveryCount}
+              {grouped.totalAmount}
             </span>
             <span
               className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-semibold border w-fit"
