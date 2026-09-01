@@ -339,6 +339,7 @@ function EditDishContent() {
                   placeholder="8"
                   type="number"
                   step="1"
+                  min="0"
                   onChange={(v) => { set("price", v); setErrors((e) => ({ ...e, price: "" })); }}
                   error={!!errors.price}
                 />
