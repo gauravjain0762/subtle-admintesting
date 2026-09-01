@@ -1,3 +1,5 @@
+import { formatDate } from "@/lib/utils/date-format";
+
 export interface Menu {
   id: string;
   name: string;
@@ -54,7 +56,7 @@ export function addMenu(menu: { name: string; description?: string }): Menu {
     name: menu.name,
     description: menu.description,
     isDefault: false,
-    createdAt: new Date().toLocaleDateString("en-GB", { month: "short", year: "numeric" }),
+    createdAt: formatDate(new Date().toISOString()),
   };
   save([newMenu, ...menus]);
   return newMenu;

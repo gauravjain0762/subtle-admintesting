@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { getTodaysOrders, type Order } from "@/lib/orders-store";
 import { getDishes, type Dish } from "@/lib/menu-store";
 import { C } from "@/lib/sk-theme";
+import { formatDate } from "@/lib/utils/date-format";
 
 function formatGrams(g: number): string {
   if (g >= 1000) return `${(g / 1000).toFixed(1)} kg`;
@@ -86,7 +87,7 @@ export default function KitchenPrepPage() {
         <div>
           <h1 className="text-[22px] font-bold" style={{ color: C.text }}>Kitchen Prep Report</h1>
           <p className="text-[13px]" style={{ color: C.textSub }}>
-            {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            {formatDate(new Date().toISOString())}
             {" · "}{orders.length} orders today
           </p>
         </div>

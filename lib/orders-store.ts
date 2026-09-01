@@ -1,6 +1,7 @@
 import { CheckCircle2, Sparkles, Ban } from "lucide-react";
 import { fetchOrders, fetchOrder, setOrderStatus, bulkSetOrderStatus, type OrderQuery } from "@/lib/api/orders";
 import type { ApiOrder } from "@/lib/api/types";
+import { formatDate } from "@/lib/utils/date-format";
 
 export interface OrderLineItem {
   dishId: string;
@@ -67,10 +68,7 @@ export function deriveInitials(name: string): string {
 }
 
 function displayDate(iso: string | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return formatDate(iso);
 }
 
 /** Backend has been observed sending totalAmount as either a bare number (13.25) or a pre-formatted string ("£13.25") — normalize to the latter. */

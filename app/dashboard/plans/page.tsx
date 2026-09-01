@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { getPlans, createPlan, updatePlan, deletePlan, type Plan as PlanType, type DeliveryPattern } from "@/lib/api/plans";
 import { getPlanSubscribers, type SubscribersResponse } from "@/lib/api/subscribers";
 import { ApiError } from "@/lib/api/client";
+import { formatDate } from "@/lib/utils/date-format";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -975,7 +976,7 @@ function SubscribersModal({
                     <div>
                       <p style={{ color: M.textFaint }}>Next Charge</p>
                       <p style={{ color: M.white }}>
-                        {new Date(subscriber.nextChargeDate).toLocaleDateString()}
+                        {formatDate(new Date(subscriber.nextChargeDate).toISOString())}
                       </p>
                     </div>
                   </div>

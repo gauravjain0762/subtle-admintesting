@@ -22,6 +22,7 @@ interface GroupedOrderRowProps {
   selectMode: boolean;
   isSelected: boolean;
   onToggleSelect: () => void;
+  onDeliveriesSelected?: (orderId: string, deliveryIds: string[]) => void;
 }
 
 export function GroupedOrderRow({
@@ -30,6 +31,7 @@ export function GroupedOrderRow({
   selectMode,
   isSelected,
   onToggleSelect,
+  onDeliveriesSelected,
 }: GroupedOrderRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedDeliveries, setSelectedDeliveries] = useState<Set<string>>(new Set());
@@ -213,6 +215,9 @@ export function GroupedOrderRow({
                             newSelected.delete(delivery.orderId);
                           }
                           setSelectedDeliveries(newSelected);
+                          if (isGrouped && onDeliveriesSelected) {
+                            onDeliveriesSelected(grouped.subscriptionId, Array.from(newSelected));
+                          }
                         }}
                         className="w-4 h-4 cursor-pointer"
                         title="Select this delivery to mark as delivered"

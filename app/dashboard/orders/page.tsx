@@ -209,6 +209,7 @@ export default function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectMode, setSelectMode]   = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedDeliveries, setSelectedDeliveries] = useState<Map<string, string[]>>(new Map());
   const [todayStats, setTodayStats]   = useState({ total: 0, new: 0, delivered: 0 });
   const [refreshKey, setRefreshKey]   = useState(0);
   const [exporting, setExporting]     = useState(false);
@@ -276,11 +277,23 @@ export default function OrdersPage() {
 
   const handleMarkClick = (status: "delivered" | "cancelled") => {
     if (!selectMode) { setSelectMode(true); return; }
-    if (selectedIds.size === 0) { exitSelectMode(); return; }
-    const ids = [...selectedIds];
+    if (selectedIds.size === 0 && selectedDeliveries.size === 0) { exitSelectMode(); return; }
+
+    let ids: string[] = [];
+    if (selectedDeliveries.size > 0) {
+      selectedDeliveries.forEach((deliveryIds) => {
+        ids = ids.concat(deliveryIds);
+      });
+    } else {
+      ids = [...selectedIds];
+    }
+
+    if (ids.length === 0) { exitSelectMode(); return; }
+
     bulkUpdateStatus(ids, status)
       .then((updatedCount) => {
         setSelectedIds(new Set());
+        setSelectedDeliveries(new Map());
         setSelectMode(false);
         setRefreshKey((k) => k + 1);
         toast.success(`${updatedCount} order${updatedCount > 1 ? "s" : ""} marked as ${STATUS_CFG[status].label}`);
@@ -291,6 +304,7 @@ export default function OrdersPage() {
   const exitSelectMode = () => {
     setSelectMode(false);
     setSelectedIds(new Set());
+    setSelectedDeliveries(new Map());
   };
 
   const escapeCsv = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
@@ -533,6 +547,15 @@ export default function OrdersPage() {
                   selectMode={selectMode}
                   isSelected={"deliveries" in order ? selectedIds.has(order.subscriptionId) : selectedIds.has(order.id)}
                   onToggleSelect={() => toggleSelected("deliveries" in order ? order.subscriptionId : order.id)}
+                  onDeliveriesSelected={(subscriptionId, deliveryIds) => {
+                    const newMap = new Map(selectedDeliveries);
+                    if (deliveryIds.length > 0) {
+                      newMap.set(subscriptionId, deliveryIds);
+                    } else {
+                      newMap.delete(subscriptionId);
+                    }
+                    setSelectedDeliveries(newMap);
+                  }}
                 />
               ))}
             </div>

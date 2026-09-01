@@ -12,6 +12,7 @@ import {
 } from "@/lib/enquiries-store";
 import { generateCode } from "@/lib/companies-store";
 import { ApiError } from "@/lib/api/client";
+import { formatDateWithTimeIST } from "@/lib/utils/date-format";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -192,7 +193,12 @@ function RequestDetailContent() {
             </span>
           </div>
           {enquiry.referenceId && (
-            <p className="mt-1 font-mono text-[11px]" style={{ color: M.textFaint }}>{enquiry.referenceId}</p>
+            <div className="mt-3 flex items-center gap-2">
+              <span className="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.05em]" style={{ background: "rgba(248,227,150,0.1)", color: M.gold, border: `1px solid ${M.goldFaint}` }}>
+                Reference Code
+              </span>
+              <span className="font-mono text-[12px] font-semibold" style={{ color: M.gold }}>{enquiry.referenceId}</span>
+            </div>
           )}
         </div>
 
@@ -288,8 +294,8 @@ function RequestDetailContent() {
           {[
             { label: "Contact", value: `${enquiry.firstName} ${enquiry.lastName}` },
             { label: "Email", value: enquiry.email },
-            { label: "Phone", value: enquiry.phone },
-            { label: "Submitted", value: new Date(enquiry.dateISO).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) },
+            { label: "Phone", value: `${enquiry.countryCode ? `${enquiry.countryCode} ` : ""}${enquiry.phone}` },
+            { label: "Submitted", value: formatDateWithTimeIST(enquiry.dateISO) },
           ].map((row) => (
             <div key={row.label} className="rounded-lg px-4 py-3" style={{ background: M.surface }}>
               <p className="text-[9.5px] font-bold uppercase tracking-[0.1em]" style={{ color: M.textFaint }}>{row.label}</p>

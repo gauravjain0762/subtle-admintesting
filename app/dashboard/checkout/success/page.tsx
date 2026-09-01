@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { CheckCircle, ArrowRight } from "lucide-react";
+import { formatDate } from "@/lib/utils/date-format";
 
 const M = {
   panel: "#0d0d0d",
@@ -86,7 +87,7 @@ export default function CheckoutSuccessPage() {
                 Next Delivery
               </span>
               <span style={{ color: M.gold }} className="text-[12px] font-bold">
-                {new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                {formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())}
               </span>
             </div>
           </div>

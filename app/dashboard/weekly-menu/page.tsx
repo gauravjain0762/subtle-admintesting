@@ -10,6 +10,7 @@ import type { WeekDayCode } from "@/lib/api/types";
 import { getDishes, type Dish } from "@/lib/menu-store";
 import { SKToggle } from "@/components/ui/sk-toggle";
 import { ApiError } from "@/lib/api/client";
+import { formatDate } from "@/lib/utils/date-format";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -61,7 +62,7 @@ function mondayOfThisWeek(): string {
 }
 
 function formatDisplay(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  return formatDate(`${iso}T00:00:00`);
 }
 
 export default function WeeklyMenuPage() {

@@ -11,6 +11,7 @@ export interface Enquiry {
   lastName: string;
   email: string;
   phone: string;
+  countryCode?: string;
   /** Business/premise type as captured on the sign-up form, e.g. "Call centre". */
   businessType: string;
   /** Already a bucketed range from the sign-up form, e.g. "26 – 50" — the backend doesn't send an exact headcount. */
@@ -42,6 +43,7 @@ function mapEnquiry(r: ApiWorkspaceRequest): Enquiry {
     lastName: r.contact?.lastName ?? "",
     email: r.contact?.email ?? "",
     phone: r.contact?.phone ?? "",
+    countryCode: r.contact?.countryCode,
     businessType: r.workspace?.premiseType ?? "",
     totalEmployees: r.workspace?.employees ?? "",
     address: r.workspace?.address1 ?? "",

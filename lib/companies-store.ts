@@ -1,5 +1,6 @@
 import { fetchWorkspaces, updateWorkspace, deleteWorkspace } from "@/lib/api/workspaces";
 import type { ApiWorkspace } from "@/lib/api/types";
+import { formatDateWithTimeIST } from "@/lib/utils/date-format";
 
 export interface Company {
   id: string;
@@ -10,6 +11,7 @@ export interface Company {
   contact: string;
   email: string;
   phone: string;
+  countryCode?: string;
   /** Already a bucketed range from the sign-up form, e.g. "26 – 50" — the backend doesn't send an exact headcount. */
   employees: string;
   activeOrders: number;
@@ -63,12 +65,13 @@ function mapCompany(w: ApiWorkspace): Company {
     contact: [w.firstName, w.lastName].filter(Boolean).join(" "),
     email: w.email ?? "",
     phone: w.phone ?? "",
+    countryCode: w.countryCode,
     employees: w.employees ?? "",
     activeOrders: w.totalOrders ?? 0,
     // No spend/billing field on the backend yet.
     monthlySpend: "",
     status: w.status,
-    since: w.createdAt,
+    since: formatDateWithTimeIST(w.createdAt),
     // No subscription-plan field on the backend yet.
     plan: "",
     logo: initials,

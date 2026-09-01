@@ -125,7 +125,8 @@ export default function CompanyRequestsPage() {
     const matchSearch = !q ||
       e.workspaceName.toLowerCase().includes(q) ||
       e.email.toLowerCase().includes(q) ||
-      e.businessType.toLowerCase().includes(q);
+      e.businessType.toLowerCase().includes(q) ||
+      e.referenceId.toLowerCase().includes(q);
     const matchStatus = statusFilter === "all" || e.status === statusFilter;
     return matchSearch && matchStatus;
   });

@@ -231,7 +231,7 @@ function CompanyDetailContent() {
           {[
             { icon: Users,     label: "Contact Name", value: company.contact || "—" },
             { icon: Mail,      label: "Email",        value: company.email || "—" },
-            { icon: Phone,     label: "Phone",        value: company.phone || "—" },
+            { icon: Phone,     label: "Phone",        value: company.countryCode ? `${company.countryCode} ${company.phone || "—"}` : (company.phone || "—") },
             { icon: Users,     label: "Total Users",  value: String(company.totalUsers) },
             { icon: ShoppingBag, label: "Active Orders", value: String(company.activeOrders) },
             { icon: Calendar,  label: "Client Since", value: company.since },
